@@ -1,16 +1,16 @@
 package software.kanunnikoff.izhitsa.ui
 
-import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import com.android.billingclient.api.BillingClient
+import com.crashlytics.android.answers.*
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
-import com.google.android.material.snackbar.Snackbar
-import com.google.firebase.analytics.FirebaseAnalytics
+import org.jetbrains.anko.design.longSnackbar
+import org.jetbrains.anko.support.v4.browse
+import org.jetbrains.anko.support.v4.share
 import software.kanunnikoff.izhitsa.Core
 import software.kanunnikoff.izhitsa.R
 import software.kanunnikoff.izhitsa.billing.BillingManager
@@ -22,65 +22,54 @@ class MenuBottomSheet : BottomSheetDialogFragment() {
 
         val billingManager = (requireActivity() as? MainActivity)?.billingManager
         val packageName = requireActivity().packageName
-        val firebaseAnalytics = FirebaseAnalytics.getInstance(requireContext())
 
         view.findViewById<TextView>(R.id.rateButton).setOnClickListener {
-            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=$packageName"))
-            startActivity(intent)
-            
-            firebaseAnalytics.logEvent(FirebaseAnalytics.Event.SELECT_CONTENT, Bundle().apply {
-                putString(FirebaseAnalytics.Param.CONTENT_TYPE, "app_rating")
-                putString(FirebaseAnalytics.Param.ITEM_ID, packageName)
-            })
+            browse("https://play.google.com/store/apps/details?id=$packageName")
+            Answers.getInstance().logRating(
+                RatingEvent()
+                    .putContentName("Rating of the app in Google Play.")
+                    .putContentType("app")
+                    .putContentId(packageName))
             dismiss()
         }
 
         view.findViewById<TextView>(R.id.shareButton).setOnClickListener {
-            val sendIntent: Intent = Intent().apply {
-                action = Intent.ACTION_SEND
-                putExtra(Intent.EXTRA_TEXT, "Google Play: https://play.google.com/store/apps/details?id=$packageName")
-                type = "text/plain"
-            }
-            val shareIntent = Intent.createChooser(sendIntent, getString(R.string.app_name))
-            startActivity(shareIntent)
-
-            firebaseAnalytics.logEvent(FirebaseAnalytics.Event.SHARE, Bundle().apply {
-                putString(FirebaseAnalytics.Param.CONTENT_TYPE, "link")
-                putString(FirebaseAnalytics.Param.ITEM_ID, packageName)
-            })
+            share("Google Play: https://play.google.com/store/apps/details?id=$packageName", getString(R.string.app_name))
+            Answers.getInstance().logShare(
+                ShareEvent()
+                    .putContentName("Link to the app in Google Play.")
+                    .putContentType("link")
+                    .putContentId(packageName))
             dismiss()
         }
 
         view.findViewById<TextView>(R.id.otherAppsButton).setOnClickListener {
-            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/dev?id=9118553902079488918"))
-            startActivity(intent)
-            
-            firebaseAnalytics.logEvent("developer_page_visited", null)
+            browse("https://play.google.com/store/apps/dev?id=9118553902079488918")
+            Answers.getInstance().logCustom(CustomEvent("Developer's page visited."))
             dismiss()
         }
 
         view.findViewById<TextView>(R.id.translatorButton).setOnClickListener {
-            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=software.kanunnikoff.yat"))
-            startActivity(intent)
-            
-            firebaseAnalytics.logEvent("yat_page_visited", null)
+            browse("https://play.google.com/store/apps/details?id=software.kanunnikoff.yat")
+            Answers.getInstance().logCustom(CustomEvent("Yat's page visited."))
             dismiss()
         }
 
         view.findViewById<TextView>(R.id.donateButton).setOnClickListener {
             if (!Core.isPremiumPurchased) {
                 if (billingManager != null && billingManager.billingClientResponseCode > BillingManager.BILLING_MANAGER_NOT_INITIALIZED) {
-                    billingManager.initiatePurchaseFlow(Core.PREMIUM_SKU_ID, BillingClient.ProductType.INAPP)
+                    billingManager.initiatePurchaseFlow(Core.PREMIUM_SKU_ID, BillingClient.SkuType.INAPP)
 
-                    firebaseAnalytics.logEvent(FirebaseAnalytics.Event.ADD_TO_CART, Bundle().apply {
-                        putDouble(FirebaseAnalytics.Param.VALUE, Core.PRICE.toDouble())
-                        putString(FirebaseAnalytics.Param.CURRENCY, Core.USD.currencyCode)
-                        putString(FirebaseAnalytics.Param.ITEM_NAME, "Premium")
-                        putString(FirebaseAnalytics.Param.ITEM_ID, Core.PREMIUM_SKU_ID)
-                    })
+                    Answers.getInstance().logAddToCart(
+                        AddToCartEvent()
+                            .putItemPrice(Core.PRICE)
+                            .putCurrency(Core.USD)
+                            .putItemName("Premium")
+                            .putItemType("In-App Purchases")
+                            .putItemId(Core.PREMIUM_SKU_ID))
                 }
             } else {
-                Snackbar.make(requireActivity().findViewById(android.R.id.content), R.string.premium_already_purchased, Snackbar.LENGTH_LONG).show()
+                view.longSnackbar(getString(R.string.premium_already_purchased))
             }
 
             dismiss()

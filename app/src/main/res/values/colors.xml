@@ -1,18 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="colorPrimary">#1A1C1E</color>
-    <color name="colorPrimaryDark">#1A1C1E</color>
-    <color name="colorAccent">#D1E4FF</color>
+    <color name="colorPrimary">#292E32</color>
+    <color name="colorPrimaryDark">#292E32</color>
+    <color name="colorAccent">#D81B60</color>
 
-    <color name="keyTextColor">#E2E2E6</color>
-    <color name="keyBackground">#43474E</color>
-    <color name="keyBackgroundPressed">#50545C</color>
-    <color name="background">#1A1C1E</color>
+    <color name="keyTextColor">#FFFFFF</color>
+    <color name="keyBackground">#42454A</color>
+    <color name="background">#292E32</color>
 
-    <color name="divider_color">#43474E</color>
+    <color name="divider_color">#e0e0e0</color>
 
-    <color name="candidate_normal">#E2E2E6</color>
-    <color name="candidate_recommended">#D1E4FF</color>
-    <color name="candidate_other">#8E9199</color>
-    <color name="candidate_background">#1A1C1E</color>
+
+    <color name="candidate_normal">#FF000000</color>
+    <color name="candidate_recommended">#FFE35900</color>
+    <color name="candidate_other">#ff808080</color>
+    <color name="candidate_background">#bbffffff</color>
 </resources>
