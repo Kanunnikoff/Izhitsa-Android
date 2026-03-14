@@ -3,14 +3,12 @@ package software.kanunnikoff.izhitsa.ui
 import android.content.Context
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
+import android.util.Log
 import android.widget.Button
 import androidx.annotation.UiThread
-import com.crashlytics.android.Crashlytics
-import com.crashlytics.android.answers.*
+import com.google.android.material.snackbar.Snackbar
 import com.google.firebase.analytics.FirebaseAnalytics
-import io.fabric.sdk.android.Fabric
-import org.jetbrains.anko.*
-import org.jetbrains.anko.design.longSnackbar
+import com.google.firebase.crashlytics.FirebaseCrashlytics
 import software.kanunnikoff.izhitsa.Core
 import software.kanunnikoff.izhitsa.Core.PRICE
 import software.kanunnikoff.izhitsa.Core.USD
@@ -20,7 +18,7 @@ import software.kanunnikoff.izhitsa.billing.BillingProvider
 import software.kanunnikoff.izhitsa.billing.MainViewController
 import software.kanunnikoff.izhitsa.percentOf
 
-class MainActivity : AppCompatActivity(), AnkoLogger, BillingProvider {
+class MainActivity : AppCompatActivity(), BillingProvider {
     var billingManager: BillingManager? = null
     private var viewController: MainViewController? = null
     private var firebaseAnalytics: FirebaseAnalytics? = null
@@ -45,16 +43,15 @@ class MainActivity : AppCompatActivity(), AnkoLogger, BillingProvider {
         firebaseAnalytics = FirebaseAnalytics.getInstance(this)
 
 // ------------------------------------------- Crashlytics
-
-        Fabric.with(this, Crashlytics())
+        // Firebase Crashlytics is initialized automatically via the gradle plugin
     }
 
     override fun isPremiumPurchased(): Boolean {
-        return viewController!!.isPremiumPurchased
+        return viewController!!.isPremiumPurchased()
     }
 
     fun onBillingManagerSetupFinished() {
-        debug("In-App Billing client is configured")
+        Log.d("MainActivity", "In-App Billing client is configured")
     }
 
     @UiThread
@@ -62,22 +59,19 @@ class MainActivity : AppCompatActivity(), AnkoLogger, BillingProvider {
         if (!Core.isPremiumPurchased) {
             Core.isPremiumPurchased = true
 
-            contentView?.longSnackbar(getString(R.string.premium_purchased))
+            Snackbar.make(findViewById(android.R.id.content), R.string.premium_purchased, Snackbar.LENGTH_LONG).show()
 
-            Answers.getInstance().logStartCheckout(
-                StartCheckoutEvent()
-                    .putTotalPrice(PRICE)
-                    .putCurrency(USD)
-                    .putItemCount(1))
+            firebaseAnalytics?.logEvent(FirebaseAnalytics.Event.BEGIN_CHECKOUT, Bundle().apply {
+                putDouble(FirebaseAnalytics.Param.VALUE, PRICE.toDouble())
+                putString(FirebaseAnalytics.Param.CURRENCY, USD.currencyCode)
+            })
 
-            Answers.getInstance().logPurchase(
-                PurchaseEvent()
-                    .putItemPrice(70 percentOf PRICE)
-                    .putCurrency(USD)
-                    .putItemName("Premium")
-                    .putItemType("In-App Purchases")
-                    .putItemId(Core.PREMIUM_SKU_ID)
-                    .putSuccess(true))
+            firebaseAnalytics?.logEvent(FirebaseAnalytics.Event.PURCHASE, Bundle().apply {
+                putDouble(FirebaseAnalytics.Param.VALUE, (70 percentOf PRICE).toDouble())
+                putString(FirebaseAnalytics.Param.CURRENCY, USD.currencyCode)
+                putString(FirebaseAnalytics.Param.ITEM_ID, Core.PREMIUM_SKU_ID)
+                putString(FirebaseAnalytics.Param.ITEM_NAME, "Premium")
+            })
         }
     }
 }
