@@ -3,6 +3,33 @@ package software.kanunnikoff.izhitsa.compose
 import software.kanunnikoff.izhitsa.R
 
 object KeyboardLayouts {
+    val Symbols = listOf(
+        listOf(
+            KeyInfo(49, "1"), KeyInfo(50, "2"), KeyInfo(51, "3"), KeyInfo(52, "4"),
+            KeyInfo(53, "5"), KeyInfo(54, "6"), KeyInfo(55, "7"), KeyInfo(56, "8"),
+            KeyInfo(57, "9"), KeyInfo(48, "0")
+        ),
+        listOf(
+            KeyInfo(64, "@"), KeyInfo(35, "#"), KeyInfo(36, "$"), KeyInfo(95, "_"),
+            KeyInfo(38, "&"), KeyInfo(45, "-"), KeyInfo(43, "+"), KeyInfo(40, "("),
+            KeyInfo(41, ")"), KeyInfo(47, "/")
+        ),
+        listOf(
+            KeyInfo(-4, "=\\" , weight = 1.5f, isModifier = true),
+            KeyInfo(42, "*"), KeyInfo(34, "\""), KeyInfo(39, "'"), KeyInfo(58, ":"),
+            KeyInfo(59, ";"), KeyInfo(33, "!"), KeyInfo(63, "?"),
+            KeyInfo(-5, iconResId = R.drawable.ic_outline_backspace_24px, weight = 1.5f, isModifier = true)
+        ),
+        listOf(
+            KeyInfo(-2, "ABC", weight = 1.5f, isModifier = true),
+            KeyInfo(44, ","),
+            KeyInfo(-4, "1234", weight = 1.2f, isModifier = true),
+            KeyInfo(32, " ", weight = 4f),
+            KeyInfo(46, "."),
+            KeyInfo(10, iconResId = R.drawable.ic_outline_keyboard_return_24px, weight = 1.5f, isModifier = true)
+        )
+    )
+
     val Russian = listOf(
         listOf(
             KeyInfo(1081, "й"), KeyInfo(1094, "ц"), KeyInfo(1091, "у"), KeyInfo(1082, "к"),

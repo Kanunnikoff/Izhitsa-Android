@@ -47,6 +47,7 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
     
     private val currentLayout = mutableStateOf(KeyboardLayouts.Russian)
     private var baseLayout: List<List<KeyInfo>> = KeyboardLayouts.Russian
+    private var layoutMode = LayoutMode.ALPHA
 
     private val lifecycleRegistry = LifecycleRegistry(this)
     private val mViewModelStore = ViewModelStore()
@@ -137,6 +138,7 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
             }
             InputType.TYPE_CLASS_TEXT -> {
                 baseLayout = KeyboardLayouts.Russian
+                layoutMode = LayoutMode.ALPHA
                 currentLayout.value = applyCaps(baseLayout, shiftState.isCapsEnabled)
                 mPredictionOn = true
 
@@ -161,6 +163,7 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
             }
             else -> {
                 baseLayout = KeyboardLayouts.English
+                layoutMode = LayoutMode.ALPHA
                 currentLayout.value = applyCaps(baseLayout, shiftState.isCapsEnabled)
             }
         }
@@ -239,13 +242,27 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
             handleBackspace()
         } else if (primaryCode == -1) { // KEYCODE_SHIFT
             handleShift()
+        } else if (primaryCode == -2) { // SYMBOLS / ABC
+            if (layoutMode == LayoutMode.ALPHA) {
+                layoutMode = LayoutMode.SYMBOLS
+                shiftState = ShiftState.OFF
+                currentLayout.value = KeyboardLayouts.Symbols
+            } else {
+                layoutMode = LayoutMode.ALPHA
+                shiftState = ShiftState.OFF
+                currentLayout.value = applyCaps(baseLayout, shiftState.isCapsEnabled)
+            }
+        } else if (primaryCode == -4) { // MORE SYMBOLS (not implemented yet)
+            // TODO: Add secondary symbols layout if needed.
         } else if (primaryCode == -101) { // KEYCODE_LANGUAGE_SWITCH
             if (baseLayout == KeyboardLayouts.Russian) {
                 baseLayout = KeyboardLayouts.English
             } else {
                 baseLayout = KeyboardLayouts.Russian
             }
-            currentLayout.value = applyCaps(baseLayout, shiftState.isCapsEnabled)
+            if (layoutMode == LayoutMode.ALPHA) {
+                currentLayout.value = applyCaps(baseLayout, shiftState.isCapsEnabled)
+            }
         } else {
             handleCharacter(primaryCode, keyCodes)
         }
@@ -286,6 +303,10 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
     }
 
     private fun handleShift() {
+        if (layoutMode == LayoutMode.SYMBOLS) {
+            return
+        }
+
         val now = System.currentTimeMillis()
 
         if (shiftState == ShiftState.CAPS_LOCK) {
@@ -321,7 +342,9 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
 
         if (shiftState == ShiftState.ONESHOT) {
             shiftState = ShiftState.OFF
-            currentLayout.value = applyCaps(baseLayout, shiftState.isCapsEnabled)
+            if (layoutMode == LayoutMode.ALPHA) {
+                currentLayout.value = applyCaps(baseLayout, shiftState.isCapsEnabled)
+            }
         }
     }
 
@@ -340,6 +363,11 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
             get() = this != OFF
     }
 
+    private enum class LayoutMode {
+        ALPHA,
+        SYMBOLS
+    }
+
     private fun isWordSeparator(code: Int): Boolean {
         return mWordSeparators?.contains(code.toChar()) == true
     }
@@ -348,6 +376,10 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         layout: List<List<KeyInfo>>,
         enabled: Boolean
     ): List<List<KeyInfo>> {
+        if (layoutMode == LayoutMode.SYMBOLS) {
+            return layout
+        }
+
         if (!enabled) {
             return layout.map { row ->
                 row.map { key ->
