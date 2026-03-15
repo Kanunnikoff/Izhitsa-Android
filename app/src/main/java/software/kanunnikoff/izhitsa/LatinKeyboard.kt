@@ -8,6 +8,7 @@ import android.inputmethodservice.Keyboard
 import android.view.inputmethod.EditorInfo
 import androidx.core.content.res.ResourcesCompat
 
+@Suppress("DEPRECATION")
 class LatinKeyboard : Keyboard {
 
     private var mEnterKey: Key? = null
@@ -84,7 +85,6 @@ class LatinKeyboard : Keyboard {
         }
     }
 
-    @Suppress("DEPRECATION")
     fun setImeOptions(res: Resources, options: Int) {
         val enterKey = mEnterKey ?: return
 

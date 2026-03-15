@@ -21,7 +21,7 @@ import software.kanunnikoff.izhitsa.percentOf
 class MainActivity : AppCompatActivity(), BillingProvider {
     var billingManager: BillingManager? = null
     private var viewController: MainViewController? = null
-    private var firebaseAnalytics: FirebaseAnalytics? = null
+    private lateinit var firebaseAnalytics: FirebaseAnalytics
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -72,14 +72,14 @@ class MainActivity : AppCompatActivity(), BillingProvider {
                 putDouble(FirebaseAnalytics.Param.VALUE, PRICE.toDouble())
                 putParcelableArray(FirebaseAnalytics.Param.ITEMS, arrayOf(checkoutItem))
             }
-            firebaseAnalytics?.logEvent(FirebaseAnalytics.Event.BEGIN_CHECKOUT, checkoutParams)
+            firebaseAnalytics.logEvent(FirebaseAnalytics.Event.BEGIN_CHECKOUT, checkoutParams)
 
             val purchaseParams = Bundle().apply {
                 putString(FirebaseAnalytics.Param.CURRENCY, USD.currencyCode)
                 putDouble(FirebaseAnalytics.Param.VALUE, (70 percentOf PRICE).toDouble())
                 putString(FirebaseAnalytics.Param.TRANSACTION_ID, Core.PREMIUM_SKU_ID)
             }
-            firebaseAnalytics?.logEvent(FirebaseAnalytics.Event.PURCHASE, purchaseParams)
+            firebaseAnalytics.logEvent(FirebaseAnalytics.Event.PURCHASE, purchaseParams)
         }
     }
 

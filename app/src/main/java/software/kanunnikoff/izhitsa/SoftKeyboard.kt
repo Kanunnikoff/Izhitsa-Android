@@ -4,7 +4,7 @@ import android.content.Context
 import android.inputmethodservice.InputMethodService
 import android.inputmethodservice.Keyboard
 import android.inputmethodservice.KeyboardView
-import android.os.IBinder
+import android.os.Build
 import android.text.InputType
 import android.text.method.MetaKeyKeyListener
 import android.view.KeyEvent
@@ -52,22 +52,29 @@ class SoftKeyboard : InputMethodService(), KeyboardView.OnKeyboardActionListener
 
     private val displayContext: Context
         get() {
-            val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
-            return createDisplayContext(wm.defaultDisplay)
+            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                // В API 30+ используем свойство display напрямую из Context/Service
+                display?.let { createDisplayContext(it) } ?: this
+            } else {
+                @Suppress("DEPRECATION")
+                val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+                @Suppress("DEPRECATION")
+                createDisplayContext(wm.defaultDisplay)
+            }
         }
 
     override fun onInitializeInterface() {
-        val displayContext = displayContext
+        val context = displayContext
         if (russianKeyboard != null) {
             val displayWidth = maxWidth
             if (displayWidth == mLastDisplayWidth) return
             mLastDisplayWidth = displayWidth
         }
-        russianKeyboard = LatinKeyboard(displayContext, R.xml.russian_keys_layout)
-        englishKeyboard = LatinKeyboard(displayContext, R.xml.english_keys_layout)
-        mSymbolsKeyboard = LatinKeyboard(displayContext, R.xml.symbols_keys_layout)
-        mSymbolsShiftedKeyboard = LatinKeyboard(displayContext, R.xml.symbols_shift_keys_layout)
-        digitsKeyboard = LatinKeyboard(displayContext, R.xml.digits_keys_layout)
+        russianKeyboard = LatinKeyboard(context, R.xml.russian_keys_layout)
+        englishKeyboard = LatinKeyboard(context, R.xml.english_keys_layout)
+        mSymbolsKeyboard = LatinKeyboard(context, R.xml.symbols_keys_layout)
+        mSymbolsShiftedKeyboard = LatinKeyboard(context, R.xml.symbols_shift_keys_layout)
+        digitsKeyboard = LatinKeyboard(context, R.xml.digits_keys_layout)
     }
 
     override fun onCreateInputView(): View {
