@@ -242,18 +242,32 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
             handleBackspace()
         } else if (primaryCode == -1) { // KEYCODE_SHIFT
             handleShift()
-        } else if (primaryCode == -2) { // SYMBOLS / ABC
-            if (layoutMode == LayoutMode.ALPHA) {
-                layoutMode = LayoutMode.SYMBOLS
-                shiftState = ShiftState.OFF
-                currentLayout.value = KeyboardLayouts.Symbols
-            } else {
-                layoutMode = LayoutMode.ALPHA
-                shiftState = ShiftState.OFF
-                currentLayout.value = applyCaps(baseLayout, shiftState.isCapsEnabled)
+        } else if (primaryCode == -2) { // SYMBOLS / ABC / ?123
+            when (layoutMode) {
+                LayoutMode.ALPHA -> {
+                    layoutMode = LayoutMode.SYMBOLS1
+                    shiftState = ShiftState.OFF
+                    currentLayout.value = KeyboardLayouts.Symbols
+                }
+                LayoutMode.SYMBOLS1 -> {
+                    layoutMode = LayoutMode.ALPHA
+                    shiftState = ShiftState.OFF
+                    currentLayout.value = applyCaps(baseLayout, shiftState.isCapsEnabled)
+                }
+                LayoutMode.SYMBOLS2 -> {
+                    layoutMode = LayoutMode.SYMBOLS1
+                    shiftState = ShiftState.OFF
+                    currentLayout.value = KeyboardLayouts.Symbols
+                }
             }
-        } else if (primaryCode == -4) { // MORE SYMBOLS (not implemented yet)
-            // TODO: Add secondary symbols layout if needed.
+        } else if (primaryCode == -4) { // MORE SYMBOLS (=\<)
+            if (layoutMode == LayoutMode.SYMBOLS1) {
+                layoutMode = LayoutMode.SYMBOLS2
+                shiftState = ShiftState.OFF
+                currentLayout.value = KeyboardLayouts.Symbols2
+            }
+        } else if (primaryCode == -6) { // 1234 placeholder
+            // Reserved for additional symbol pages.
         } else if (primaryCode == -101) { // KEYCODE_LANGUAGE_SWITCH
             if (baseLayout == KeyboardLayouts.Russian) {
                 baseLayout = KeyboardLayouts.English
@@ -303,7 +317,7 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
     }
 
     private fun handleShift() {
-        if (layoutMode == LayoutMode.SYMBOLS) {
+        if (layoutMode != LayoutMode.ALPHA) {
             return
         }
 
@@ -365,7 +379,8 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
 
     private enum class LayoutMode {
         ALPHA,
-        SYMBOLS
+        SYMBOLS1,
+        SYMBOLS2
     }
 
     private fun isWordSeparator(code: Int): Boolean {
@@ -376,7 +391,7 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         layout: List<List<KeyInfo>>,
         enabled: Boolean
     ): List<List<KeyInfo>> {
-        if (layoutMode == LayoutMode.SYMBOLS) {
+        if (layoutMode != LayoutMode.ALPHA) {
             return layout
         }
 

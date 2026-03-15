@@ -23,9 +23,36 @@ object KeyboardLayouts {
         listOf(
             KeyInfo(-2, "ABC", weight = 1.5f, isModifier = true),
             KeyInfo(44, ","),
-            KeyInfo(-4, "1234", weight = 1.2f, isModifier = true),
+            KeyInfo(-6, "1234", weight = 1.2f, isModifier = true),
             KeyInfo(32, " ", weight = 4f),
             KeyInfo(46, "."),
+            KeyInfo(10, iconResId = R.drawable.ic_outline_keyboard_return_24px, weight = 1.5f, isModifier = true)
+        )
+    )
+
+    val Symbols2 = listOf(
+        listOf(
+            KeyInfo(126, "~"), KeyInfo(96, "`"), KeyInfo(124, "|"), KeyInfo(8226, "•"),
+            KeyInfo(8730, "√"), KeyInfo(960, "π"), KeyInfo(247, "÷"), KeyInfo(215, "×"),
+            KeyInfo(167, "§"), KeyInfo(916, "Δ")
+        ),
+        listOf(
+            KeyInfo(163, "£"), KeyInfo(162, "¢"), KeyInfo(8364, "€"), KeyInfo(165, "¥"),
+            KeyInfo(94, "^"), KeyInfo(176, "°"), KeyInfo(61, "="), KeyInfo(123, "{"),
+            KeyInfo(125, "}"), KeyInfo(92, "\\")
+        ),
+        listOf(
+            KeyInfo(-2, "?123", weight = 1.5f, isModifier = true),
+            KeyInfo(37, "%"), KeyInfo(169, "©"), KeyInfo(174, "®"), KeyInfo(8482, "™"),
+            KeyInfo(10003, "✓"), KeyInfo(91, "["), KeyInfo(93, "]"),
+            KeyInfo(-5, iconResId = R.drawable.ic_outline_backspace_24px, weight = 1.5f, isModifier = true)
+        ),
+        listOf(
+            KeyInfo(-2, "ABC", weight = 1.5f, isModifier = true),
+            KeyInfo(60, "<"),
+            KeyInfo(-6, "1234", weight = 1.2f, isModifier = true),
+            KeyInfo(32, " ", weight = 4f),
+            KeyInfo(62, ">"),
             KeyInfo(10, iconResId = R.drawable.ic_outline_keyboard_return_24px, weight = 1.5f, isModifier = true)
         )
     )
