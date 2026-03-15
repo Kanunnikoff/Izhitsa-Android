@@ -22,6 +22,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.asPaddingValues
 import software.kanunnikoff.izhitsa.R
 
 data class KeyInfo(
@@ -37,11 +40,14 @@ fun KeyboardScreen(
     rows: List<List<KeyInfo>>,
     onKeyClick: (Int) -> Unit
 ) {
+    val navBarsPadding = WindowInsets.navigationBars.asPaddingValues()
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(Color(0xFF1C1C1C)) // Темный фон клавиатуры
             .padding(all = 4.dp)
+            .padding(bottom = navBarsPadding.calculateBottomPadding()*2)
     ) {
         rows.forEach { row ->
             Row(
