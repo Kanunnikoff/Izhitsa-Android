@@ -57,11 +57,9 @@ public class MainViewController {
         @Override
         public void onPurchasesUpdated(List<Purchase> purchaseList) {
             for (Purchase purchase : purchaseList) {
-                switch (purchase.getSku()) {
-                    case Core.PREMIUM_SKU_ID:
-                        mIsPremium = true;
-                        mActivity.premiumPurchased();
-                        break;
+                if (purchase.getProducts().contains(Core.PREMIUM_SKU_ID)) {
+                    mIsPremium = true;
+                    mActivity.premiumPurchased();
                 }
             }
         }

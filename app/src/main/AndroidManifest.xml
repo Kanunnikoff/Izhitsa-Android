@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-          xmlns:tools="http://schemas.android.com/tools"
-          package="software.kanunnikoff.izhitsa">
+          xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="com.android.vending.BILLING"/>
 
@@ -13,11 +12,9 @@
             android:theme="@style/AppTheme"
             tools:ignore="GoogleAppIndexingWarning">
 
-        <meta-data
-                android:name="io.fabric.ApiKey"
-                android:value="45ad5d720ca4f2a9a270d302ab35fa6d790f292c"/>
-
-        <activity android:name=".ui.MainActivity">
+        <activity
+                android:name=".ui.MainActivity"
+                android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
 
@@ -26,7 +23,9 @@
         </activity>
 
 <!--        <service android:name=".MyInputMethodService"-->
-        <service android:name=".SoftKeyboard"
+        <service
+                android:name=".SoftKeyboard"
+                android:exported="true"
                  android:permission="android.permission.BIND_INPUT_METHOD">
 
             <intent-filter>
