@@ -58,6 +58,7 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
 
     override fun onCreate() {
         super.onCreate()
+
         mInputMethodManager = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
         mWordSeparators = resources.getString(R.string.word_separators)
 
@@ -100,6 +101,7 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
             decorView.setViewTreeViewModelStoreOwner(this@SoftKeyboard)
             decorView.setViewTreeSavedStateRegistryOwner(this@SoftKeyboard)
         }
+
         return ComposeView(this).apply {
             setViewTreeLifecycleOwner(this@SoftKeyboard)
             setViewTreeViewModelStoreOwner(this@SoftKeyboard)
@@ -166,6 +168,7 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
 
     override fun onFinishInput() {
         super.onFinishInput()
+
         mComposing.setLength(0)
         updateCandidates()
         setCandidatesViewShown(false)
@@ -191,6 +194,7 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
     override fun onDisplayCompletions(completions: Array<CompletionInfo>?) {
         if (mCompletionOn) {
             mCompletions = completions
+
             if (completions == null) {
                 setSuggestions(null, completions = false, typedWordValid = false)
                 return
@@ -261,11 +265,13 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         if (!suggestions.isNullOrEmpty() || isExtractViewShown) {
             setCandidatesViewShown(true)
         }
+
         mCandidateView?.setSuggestions(suggestions, completions, typedWordValid)
     }
 
     private fun handleBackspace() {
         val length = mComposing.length
+
         if (length > 1) {
             mComposing.delete(length - 1, length)
             currentInputConnection.setComposingText(mComposing, 1)
@@ -281,25 +287,38 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
 
     private fun handleShift() {
         val now = System.currentTimeMillis()
-        shiftState = when (shiftState) {
-            ShiftState.CAPS_LOCK -> ShiftState.OFF
-            ShiftState.ONESHOT -> {
-                if (mLastShiftTime + 800 > now) ShiftState.CAPS_LOCK else ShiftState.ONESHOT
-            }
-            ShiftState.OFF -> ShiftState.ONESHOT
+
+        if (shiftState == ShiftState.CAPS_LOCK) {
+            shiftState = ShiftState.OFF
+            mLastShiftTime = 0
+            currentLayout.value = applyCaps(baseLayout, shiftState.isCapsEnabled)
+            return
         }
+
+        shiftState = when (shiftState) {
+            ShiftState.ONESHOT -> {
+                if (mLastShiftTime + 800 > now) ShiftState.CAPS_LOCK else ShiftState.OFF
+            }
+
+            ShiftState.OFF -> ShiftState.ONESHOT
+            ShiftState.CAPS_LOCK -> ShiftState.OFF
+        }
+
         mLastShiftTime = now
         currentLayout.value = applyCaps(baseLayout, shiftState.isCapsEnabled)
     }
 
     private fun handleCharacter(primaryCode: Int, keyCodes: IntArray?) {
         var code = primaryCode
+
         if (shiftState.isCapsEnabled) {
             code = Character.toUpperCase(code)
         }
+
         mComposing.append(code.toChar())
         currentInputConnection.setComposingText(mComposing, 1)
         updateCandidates()
+
         if (shiftState == ShiftState.ONESHOT) {
             shiftState = ShiftState.OFF
             currentLayout.value = applyCaps(baseLayout, shiftState.isCapsEnabled)
