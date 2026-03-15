@@ -2,90 +2,115 @@ package software.kanunnikoff.izhitsa
 
 import android.content.Context
 import android.inputmethodservice.InputMethodService
-import android.inputmethodservice.Keyboard
-import android.inputmethodservice.KeyboardView
 import android.os.Build
 import android.text.InputType
-import android.text.method.MetaKeyKeyListener
 import android.view.KeyEvent
 import android.view.View
-import android.view.WindowManager
 import android.view.inputmethod.CompletionInfo
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputMethodManager
-import java.util.*
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.platform.ComposeView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.ViewModelStoreOwner
+import androidx.lifecycle.setViewTreeLifecycleOwner
+import androidx.lifecycle.setViewTreeViewModelStoreOwner
+import androidx.savedstate.SavedStateRegistry
+import androidx.savedstate.SavedStateRegistryController
+import androidx.savedstate.SavedStateRegistryOwner
+import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import software.kanunnikoff.izhitsa.compose.KeyboardLayouts
+import software.kanunnikoff.izhitsa.compose.KeyboardScreen
+import software.kanunnikoff.izhitsa.compose.KeyInfo
+import java.util.Locale
 
 /**
  * Example of writing an input method for a soft keyboard.
  */
-class SoftKeyboard : InputMethodService(), KeyboardView.OnKeyboardActionListener {
+class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, SavedStateRegistryOwner {
 
     private var mInputMethodManager: InputMethodManager? = null
-    private var mInputView: LatinKeyboardView? = null
     private var mCandidateView: CandidateView? = null
     private var mCompletions: Array<CompletionInfo>? = null
 
     private val mComposing = StringBuilder()
     private var mPredictionOn = false
     private var mCompletionOn = false
-    private var mLastDisplayWidth = 0
-    private var mCapsLock = false
+    private var shiftState = ShiftState.OFF
     private var mLastShiftTime: Long = 0
-    private var mMetaState: Long = 0
-
-    private var russianKeyboard: LatinKeyboard? = null
-    private var englishKeyboard: LatinKeyboard? = null
-    private var mSymbolsKeyboard: LatinKeyboard? = null
-    private var mSymbolsShiftedKeyboard: LatinKeyboard? = null
-    private var digitsKeyboard: LatinKeyboard? = null
-
-    private var mCurKeyboard: LatinKeyboard? = null
 
     private var mWordSeparators: String? = null
+    
+    private val currentLayout = mutableStateOf(KeyboardLayouts.Russian)
+    private var baseLayout: List<List<KeyInfo>> = KeyboardLayouts.Russian
+
+    private val lifecycleRegistry = LifecycleRegistry(this)
+    private val mViewModelStore = ViewModelStore()
+    private val savedStateRegistryController = SavedStateRegistryController.create(this)
+
+    override val lifecycle: Lifecycle get() = lifecycleRegistry
+    override val viewModelStore: ViewModelStore get() = mViewModelStore
+    override val savedStateRegistry: SavedStateRegistry get() = savedStateRegistryController.savedStateRegistry
 
     override fun onCreate() {
         super.onCreate()
         mInputMethodManager = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
         mWordSeparators = resources.getString(R.string.word_separators)
+
+        savedStateRegistryController.performRestore(null)
+        lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
+    }
+
+    override fun onWindowShown() {
+        super.onWindowShown()
+        lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START)
+        lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
+    }
+
+    override fun onWindowHidden() {
+        super.onWindowHidden()
+        lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
     }
 
     private val displayContext: Context
         get() {
             return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                // В API 30+ используем свойство display напрямую из Context/Service
                 display?.let { createDisplayContext(it) } ?: this
             } else {
                 @Suppress("DEPRECATION")
-                val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+                val wm = getSystemService(Context.WINDOW_SERVICE) as android.view.WindowManager
                 @Suppress("DEPRECATION")
                 createDisplayContext(wm.defaultDisplay)
             }
         }
 
-    override fun onInitializeInterface() {
-        val context = displayContext
-        if (russianKeyboard != null) {
-            val displayWidth = maxWidth
-            if (displayWidth == mLastDisplayWidth) return
-            mLastDisplayWidth = displayWidth
-        }
-        russianKeyboard = LatinKeyboard(context, R.xml.russian_keys_layout)
-        englishKeyboard = LatinKeyboard(context, R.xml.english_keys_layout)
-        mSymbolsKeyboard = LatinKeyboard(context, R.xml.symbols_keys_layout)
-        mSymbolsShiftedKeyboard = LatinKeyboard(context, R.xml.symbols_shift_keys_layout)
-        digitsKeyboard = LatinKeyboard(context, R.xml.digits_keys_layout)
-    }
-
     override fun onCreateInputView(): View {
-        mInputView = layoutInflater.inflate(R.layout.input, null) as LatinKeyboardView
-        mInputView?.setOnKeyboardActionListener(this)
-        setLatinKeyboard(russianKeyboard)
-        return mInputView!!
-    }
-
-    private fun setLatinKeyboard(nextKeyboard: LatinKeyboard?) {
-        mInputView?.keyboard = nextKeyboard
+        // Ensure the IME window root has view tree owners for Compose.
+        window?.window?.decorView?.let { decorView ->
+            decorView.setViewTreeLifecycleOwner(this@SoftKeyboard)
+            decorView.setViewTreeViewModelStoreOwner(this@SoftKeyboard)
+            decorView.setViewTreeSavedStateRegistryOwner(this@SoftKeyboard)
+        }
+        return ComposeView(this).apply {
+            setViewTreeLifecycleOwner(this@SoftKeyboard)
+            setViewTreeViewModelStoreOwner(this@SoftKeyboard)
+            setViewTreeSavedStateRegistryOwner(this@SoftKeyboard)
+            setContent {
+                KeyboardScreen(
+                    rows = currentLayout.value,
+                    onKeyClick = { code -> onKey(code, null) }
+                )
+            }
+        }
     }
 
     override fun onCreateCandidatesView(): View {
@@ -100,20 +125,17 @@ class SoftKeyboard : InputMethodService(), KeyboardView.OnKeyboardActionListener
         mComposing.setLength(0)
         updateCandidates()
 
-        if (!restarting) {
-            mMetaState = 0
-        }
-
         mPredictionOn = false
         mCompletionOn = false
         mCompletions = null
 
         when (attribute.inputType and InputType.TYPE_MASK_CLASS) {
             InputType.TYPE_CLASS_NUMBER, InputType.TYPE_CLASS_DATETIME, InputType.TYPE_CLASS_PHONE -> {
-                mCurKeyboard = digitsKeyboard
+                // TODO: Add digits layout to Compose
             }
             InputType.TYPE_CLASS_TEXT -> {
-                mCurKeyboard = russianKeyboard
+                baseLayout = KeyboardLayouts.Russian
+                currentLayout.value = applyCaps(baseLayout, shiftState.isCapsEnabled)
                 mPredictionOn = true
 
                 val variation = attribute.inputType and InputType.TYPE_MASK_VARIATION
@@ -134,39 +156,19 @@ class SoftKeyboard : InputMethodService(), KeyboardView.OnKeyboardActionListener
                     mPredictionOn = false
                     mCompletionOn = isFullscreenMode
                 }
-
-                updateShiftKeyState(attribute)
             }
             else -> {
-                mCurKeyboard = englishKeyboard
-                updateShiftKeyState(attribute)
+                baseLayout = KeyboardLayouts.English
+                currentLayout.value = applyCaps(baseLayout, shiftState.isCapsEnabled)
             }
         }
-
-        mCurKeyboard?.setImeOptions(resources, attribute.imeOptions)
     }
 
     override fun onFinishInput() {
         super.onFinishInput()
-
         mComposing.setLength(0)
         updateCandidates()
         setCandidatesViewShown(false)
-
-        mCurKeyboard = russianKeyboard
-        mInputView?.closing()
-    }
-
-    override fun onStartInputView(attribute: EditorInfo, restarting: Boolean) {
-        super.onStartInputView(attribute, restarting)
-        setLatinKeyboard(mCurKeyboard)
-        mInputView?.closing()
-        val subtype = mInputMethodManager?.currentInputMethodSubtype
-        subtype?.let { mInputView?.setSubtypeOnSpaceKey(it) }
-    }
-
-    override fun onCurrentInputMethodSubtypeChanged(subtype: android.view.inputmethod.InputMethodSubtype?) {
-        subtype?.let { mInputView?.setSubtypeOnSpaceKey(it) }
     }
 
     override fun onUpdateSelection(
@@ -199,94 +201,11 @@ class SoftKeyboard : InputMethodService(), KeyboardView.OnKeyboardActionListener
         }
     }
 
-    private fun translateKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        mMetaState = MetaKeyKeyListener.handleKeyDown(mMetaState, keyCode, event)
-        var c = event.getUnicodeChar(MetaKeyKeyListener.getMetaState(mMetaState))
-        mMetaState = MetaKeyKeyListener.adjustMetaAfterKeypress(mMetaState)
-        val ic = currentInputConnection
-        if (c == 0 || ic == null) return false
-
-        if (c and android.view.KeyCharacterMap.COMBINING_ACCENT != 0) {
-            c = c and android.view.KeyCharacterMap.COMBINING_ACCENT_MASK
-        }
-
-        if (mComposing.isNotEmpty()) {
-            val accent = mComposing[mComposing.length - 1]
-            val composed = KeyEvent.getDeadChar(accent.toInt(), c)
-            if (composed != 0) {
-                c = composed
-                mComposing.setLength(mComposing.length - 1)
-            }
-        }
-
-        onKey(c, null)
-        return true
-    }
-
-    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        when (keyCode) {
-            KeyEvent.KEYCODE_BACK -> {
-                if (event.repeatCount == 0 && mInputView != null) {
-                    if (mInputView!!.handleBack()) return true
-                }
-            }
-            KeyEvent.KEYCODE_DEL -> {
-                if (mComposing.isNotEmpty()) {
-                    onKey(Keyboard.KEYCODE_DELETE, null)
-                    return true
-                }
-            }
-            KeyEvent.KEYCODE_ENTER -> return false
-            else -> if (PROCESS_HARD_KEYS) {
-                if (keyCode == KeyEvent.KEYCODE_SPACE && (event.metaState and KeyEvent.META_ALT_ON) != 0) {
-                    val ic = currentInputConnection
-                    if (ic != null) {
-                        ic.clearMetaKeyStates(KeyEvent.META_ALT_ON)
-                        "android".forEach { keyDownUp(getRawKeyCodeForChar(it.toInt())) }
-                        return true
-                    }
-                }
-                if (mPredictionOn && translateKeyDown(keyCode, event)) return true
-            }
-        }
-        return super.onKeyDown(keyCode, event)
-    }
-
-    private fun getRawKeyCodeForChar(c: Int): Int {
-        return when (c.toChar()) {
-            'a' -> KeyEvent.KEYCODE_A
-            'n' -> KeyEvent.KEYCODE_N
-            'd' -> KeyEvent.KEYCODE_D
-            'r' -> KeyEvent.KEYCODE_R
-            'o' -> KeyEvent.KEYCODE_O
-            'i' -> KeyEvent.KEYCODE_I
-            else -> 0
-        }
-    }
-
-    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
-        if (PROCESS_HARD_KEYS && mPredictionOn) {
-            mMetaState = MetaKeyKeyListener.handleKeyUp(mMetaState, keyCode, event)
-        }
-        return super.onKeyUp(keyCode, event)
-    }
-
     private fun commitTyped(inputConnection: InputConnection) {
         if (mComposing.isNotEmpty()) {
             inputConnection.commitText(mComposing, mComposing.length)
             mComposing.setLength(0)
             updateCandidates()
-        }
-    }
-
-    private fun updateShiftKeyState(attr: EditorInfo?) {
-        if (attr != null && mInputView != null && (englishKeyboard == mInputView?.keyboard || russianKeyboard == mInputView?.keyboard)) {
-            var caps = 0
-            val ei = currentInputEditorInfo
-            if (ei != null && ei.inputType != InputType.TYPE_NULL) {
-                caps = currentInputConnection.getCursorCapsMode(attr.inputType)
-            }
-            mInputView?.isShifted = mCapsLock || caps != 0
         }
     }
 
@@ -297,10 +216,10 @@ class SoftKeyboard : InputMethodService(), KeyboardView.OnKeyboardActionListener
 
     private fun sendKey(keyCode: Int) {
         when (keyCode) {
-            '\n'.toInt() -> keyDownUp(KeyEvent.KEYCODE_ENTER)
+            '\n'.code -> keyDownUp(KeyEvent.KEYCODE_ENTER)
             else -> {
-                if (keyCode >= '0'.toInt() && keyCode <= '9'.toInt()) {
-                    keyDownUp(keyCode - '0'.toInt() + KeyEvent.KEYCODE_0)
+                if (keyCode >= '0'.code && keyCode <= '9'.code) {
+                    keyDownUp(keyCode - '0'.code + KeyEvent.KEYCODE_0)
                 } else {
                     currentInputConnection.commitText(keyCode.toChar().toString(), 1)
                 }
@@ -308,63 +227,24 @@ class SoftKeyboard : InputMethodService(), KeyboardView.OnKeyboardActionListener
         }
     }
 
-    override fun onKey(primaryCode: Int, keyCodes: IntArray?) {
+    fun onKey(primaryCode: Int, keyCodes: IntArray?) {
         if (isWordSeparator(primaryCode)) {
             if (mComposing.isNotEmpty()) commitTyped(currentInputConnection)
             sendKey(primaryCode)
-            updateShiftKeyState(currentInputEditorInfo)
-        } else if (primaryCode == Keyboard.KEYCODE_DELETE) {
+        } else if (primaryCode == -5) { // KEYCODE_DELETE
             handleBackspace()
-        } else if (primaryCode == Keyboard.KEYCODE_SHIFT) {
+        } else if (primaryCode == -1) { // KEYCODE_SHIFT
             handleShift()
-        } else if (primaryCode == Keyboard.KEYCODE_CANCEL) {
-            handleClose()
-        } else if (primaryCode == LatinKeyboardView.KEYCODE_LANGUAGE_SWITCH) {
-            val current = mInputView?.keyboard
-            if (current == russianKeyboard) {
-                setLatinKeyboard(englishKeyboard)
+        } else if (primaryCode == -101) { // KEYCODE_LANGUAGE_SWITCH
+            if (baseLayout == KeyboardLayouts.Russian) {
+                baseLayout = KeyboardLayouts.English
             } else {
-                setLatinKeyboard(russianKeyboard)
+                baseLayout = KeyboardLayouts.Russian
             }
-        } else if (primaryCode == Keyboard.KEYCODE_MODE_CHANGE && mInputView != null) {
-            val current = mInputView?.keyboard
-            if (current == mSymbolsKeyboard || current == mSymbolsShiftedKeyboard) {
-                setLatinKeyboard(russianKeyboard)
-            } else {
-                setLatinKeyboard(mSymbolsKeyboard)
-                mSymbolsKeyboard?.isShifted = false
-            }
-        } else if (primaryCode == LatinKeyboardView.KEYCODE_MODE_2_CHANGE && mInputView != null) {
-            val current = mInputView?.keyboard
-            if (current == mSymbolsKeyboard) {
-                setLatinKeyboard(mSymbolsShiftedKeyboard)
-            } else {
-                setLatinKeyboard(mSymbolsKeyboard)
-            }
-        } else if (primaryCode == LatinKeyboardView.KEYCODE_MODE_3_CHANGE && mInputView != null) {
-            val current = mInputView?.keyboard
-            if (current == mSymbolsKeyboard || current == mSymbolsShiftedKeyboard) {
-                setLatinKeyboard(digitsKeyboard)
-            } else {
-                setLatinKeyboard(mSymbolsKeyboard)
-            }
-        } else if (primaryCode == LatinKeyboardView.KEYCODE_MODE_4_CHANGE && mInputView != null) {
-            val current = mInputView?.keyboard
-            if (current == mSymbolsKeyboard || current == mSymbolsShiftedKeyboard || current == digitsKeyboard) {
-                setLatinKeyboard(russianKeyboard)
-            }
+            currentLayout.value = applyCaps(baseLayout, shiftState.isCapsEnabled)
         } else {
             handleCharacter(primaryCode, keyCodes)
         }
-    }
-
-    override fun onText(text: CharSequence) {
-        val ic = currentInputConnection ?: return
-        ic.beginBatchEdit()
-        if (mComposing.isNotEmpty()) commitTyped(ic)
-        ic.commitText(text, 0)
-        ic.endBatchEdit()
-        updateShiftKeyState(currentInputEditorInfo)
     }
 
     private fun updateCandidates() {
@@ -397,54 +277,83 @@ class SoftKeyboard : InputMethodService(), KeyboardView.OnKeyboardActionListener
         } else {
             keyDownUp(KeyEvent.KEYCODE_DEL)
         }
-        updateShiftKeyState(currentInputEditorInfo)
     }
 
     private fun handleShift() {
-        val currentKeyboard = mInputView?.keyboard
-        if (russianKeyboard == currentKeyboard || englishKeyboard == currentKeyboard) {
-            checkToggleCapsLock()
-            mInputView?.isShifted = mCapsLock || !mInputView!!.isShifted
-        } else if (currentKeyboard == mSymbolsKeyboard) {
-            mSymbolsKeyboard?.isShifted = true
-            setLatinKeyboard(mSymbolsShiftedKeyboard)
-            mSymbolsShiftedKeyboard?.isShifted = true
-        } else if (currentKeyboard == mSymbolsShiftedKeyboard) {
-            mSymbolsShiftedKeyboard?.isShifted = false
-            setLatinKeyboard(mSymbolsKeyboard)
-            mSymbolsKeyboard?.isShifted = false
+        val now = System.currentTimeMillis()
+        shiftState = when (shiftState) {
+            ShiftState.CAPS_LOCK -> ShiftState.OFF
+            ShiftState.ONESHOT -> {
+                if (mLastShiftTime + 800 > now) ShiftState.CAPS_LOCK else ShiftState.ONESHOT
+            }
+            ShiftState.OFF -> ShiftState.ONESHOT
         }
+        mLastShiftTime = now
+        currentLayout.value = applyCaps(baseLayout, shiftState.isCapsEnabled)
     }
 
     private fun handleCharacter(primaryCode: Int, keyCodes: IntArray?) {
         var code = primaryCode
-        if (isInputViewShown && mInputView!!.isShifted) {
+        if (shiftState.isCapsEnabled) {
             code = Character.toUpperCase(code)
         }
         mComposing.append(code.toChar())
         currentInputConnection.setComposingText(mComposing, 1)
-        updateShiftKeyState(currentInputEditorInfo)
         updateCandidates()
+        if (shiftState == ShiftState.ONESHOT) {
+            shiftState = ShiftState.OFF
+            currentLayout.value = applyCaps(baseLayout, shiftState.isCapsEnabled)
+        }
     }
 
+    @Suppress("unused")
     private fun handleClose() {
         commitTyped(currentInputConnection)
         requestHideSelf(0)
-        mInputView?.closing()
     }
 
-    private fun checkToggleCapsLock() {
-        val now = System.currentTimeMillis()
-        if (mLastShiftTime + 800 > now) {
-            mCapsLock = !mCapsLock
-            mLastShiftTime = 0
-        } else {
-            mLastShiftTime = now
-        }
+    private enum class ShiftState {
+        OFF,
+        ONESHOT,
+        CAPS_LOCK;
+
+        val isCapsEnabled: Boolean
+            get() = this != OFF
     }
 
     private fun isWordSeparator(code: Int): Boolean {
         return mWordSeparators?.contains(code.toChar()) == true
+    }
+
+    private fun applyCaps(
+        layout: List<List<KeyInfo>>,
+        enabled: Boolean
+    ): List<List<KeyInfo>> {
+        if (!enabled) {
+            return layout.map { row ->
+                row.map { key ->
+                    if (key.label?.length == 1 && key.code > 0 && !key.isModifier) {
+                        val lower = key.label.lowercase(Locale.getDefault())
+                        val lowerCode = lower[0].code
+                        key.copy(label = lower, code = lowerCode)
+                    } else {
+                        key
+                    }
+                }
+            }
+        }
+
+        return layout.map { row ->
+            row.map { key ->
+                if (key.label?.length == 1 && key.code > 0 && !key.isModifier) {
+                    val upper = key.label.uppercase(Locale.getDefault())
+                    val upperCode = upper[0].code
+                    key.copy(label = upper, code = upperCode)
+                } else {
+                    key
+                }
+            }
+        }
     }
 
     fun pickSuggestionManually(index: Int) {
@@ -452,23 +361,8 @@ class SoftKeyboard : InputMethodService(), KeyboardView.OnKeyboardActionListener
             val ci = mCompletions!![index]
             currentInputConnection.commitCompletion(ci)
             mCandidateView?.clear()
-            updateShiftKeyState(currentInputEditorInfo)
         } else if (mComposing.isNotEmpty()) {
             commitTyped(currentInputConnection)
         }
-    }
-
-    override fun swipeRight() {
-        if (mCompletionOn) pickSuggestionManually(0)
-    }
-
-    override fun swipeLeft() = handleBackspace()
-    override fun swipeDown() = handleClose()
-    override fun swipeUp() {}
-    override fun onPress(primaryCode: Int) {}
-    override fun onRelease(primaryCode: Int) {}
-
-    companion object {
-        const val PROCESS_HARD_KEYS = true
     }
 }
