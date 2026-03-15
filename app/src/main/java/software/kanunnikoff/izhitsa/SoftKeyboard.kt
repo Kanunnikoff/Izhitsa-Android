@@ -1,755 +1,467 @@
-/*
- * Copyright (C) 2008-2009 The Android Open Source Project
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-package software.kanunnikoff.izhitsa;
+package software.kanunnikoff.izhitsa
 
-import android.app.Dialog;
-import android.content.Context;
-import android.inputmethodservice.InputMethodService;
-import android.inputmethodservice.Keyboard;
-import android.inputmethodservice.KeyboardView;
-import android.os.IBinder;
-import android.text.InputType;
-import android.text.method.MetaKeyKeyListener;
-import android.util.Log;
-import android.view.Display;
-import android.view.KeyCharacterMap;
-import android.view.KeyEvent;
-import android.view.View;
-import android.view.Window;
-import android.view.WindowManager;
-import android.view.inputmethod.CompletionInfo;
-import android.view.inputmethod.EditorInfo;
-import android.view.inputmethod.InputConnection;
-import android.view.inputmethod.InputMethodManager;
-import android.view.inputmethod.InputMethodSubtype;
-import android.widget.Toast;
+import android.content.Context
+import android.inputmethodservice.InputMethodService
+import android.inputmethodservice.Keyboard
+import android.inputmethodservice.KeyboardView
+import android.os.IBinder
+import android.text.InputType
+import android.text.method.MetaKeyKeyListener
+import android.view.KeyEvent
+import android.view.View
+import android.view.WindowManager
+import android.view.inputmethod.CompletionInfo
+import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputConnection
+import android.view.inputmethod.InputMethodManager
+import java.util.*
 
-import androidx.annotation.NonNull;
-import java.util.ArrayList;
-import java.util.List;
 /**
- * Example of writing an input method for a soft keyboard.  This code is
- * focused on simplicity over completeness, so it should in no way be considered
- * to be a complete soft keyboard implementation.  Its purpose is to provide
- * a basic example for how you would get started writing an input method, to
- * be fleshed out as appropriate.
+ * Example of writing an input method for a soft keyboard.
  */
-public class SoftKeyboard extends InputMethodService
-        implements KeyboardView.OnKeyboardActionListener {
-    static final boolean DEBUG = false;
+class SoftKeyboard : InputMethodService(), KeyboardView.OnKeyboardActionListener {
 
-    /**
-     * This boolean indicates the optional example code for performing
-     * processing of hard keys in addition to regular text generation
-     * from on-screen interaction.  It would be used for input methods that
-     * perform language translations (such as converting text entered on
-     * a QWERTY keyboard to Chinese), but may not be used for input methods
-     * that are primarily intended to be used for on-screen text entry.
-     */
-    static final boolean PROCESS_HARD_KEYS = true;
-    private InputMethodManager mInputMethodManager;
-    private LatinKeyboardView mInputView;
-    private CandidateView mCandidateView;
-    private CompletionInfo[] mCompletions;
+    private var mInputMethodManager: InputMethodManager? = null
+    private var mInputView: LatinKeyboardView? = null
+    private var mCandidateView: CandidateView? = null
+    private var mCompletions: Array<CompletionInfo>? = null
 
-    private StringBuilder mComposing = new StringBuilder();
-    private boolean mPredictionOn;
-    private boolean mCompletionOn;
-    private int mLastDisplayWidth;
-    private boolean mCapsLock;
-    private long mLastShiftTime;
-    private long mMetaState;
+    private val mComposing = StringBuilder()
+    private var mPredictionOn = false
+    private var mCompletionOn = false
+    private var mLastDisplayWidth = 0
+    private var mCapsLock = false
+    private var mLastShiftTime: Long = 0
+    private var mMetaState: Long = 0
 
-    private LatinKeyboard russianKeyboard;
-    private LatinKeyboard englishKeyboard;
-    private LatinKeyboard mSymbolsKeyboard;
-    private LatinKeyboard mSymbolsShiftedKeyboard;
-    private LatinKeyboard digitsKeyboard;
+    private var russianKeyboard: LatinKeyboard? = null
+    private var englishKeyboard: LatinKeyboard? = null
+    private var mSymbolsKeyboard: LatinKeyboard? = null
+    private var mSymbolsShiftedKeyboard: LatinKeyboard? = null
+    private var digitsKeyboard: LatinKeyboard? = null
 
-    private LatinKeyboard mCurKeyboard;
+    private var mCurKeyboard: LatinKeyboard? = null
 
-    private String mWordSeparators;
+    private var mWordSeparators: String? = null
 
-    /**
-     * Main initialization of the input method component.  Be sure to call
-     * to super class.
-     */
-    @Override public void onCreate() {
-        super.onCreate();
-        mInputMethodManager = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
-        mWordSeparators = getResources().getString(R.string.word_separators);
-    }
-    /**
-     * Create new context object whose resources are adjusted to match the metrics of the display
-     * which is managed by WindowManager.
-     *
-     * @see {@link Context#createDisplayContext(Display)}
-     */
-    @NonNull Context getDisplayContext() {
-        // TODO (b/133825283): Non-activity components Resources / DisplayMetrics update when
-        //  moving to external display.
-        // An issue in Q that non-activity components Resources / DisplayMetrics in
-        // Context doesn't well updated when the IME window moving to external display.
-        // Currently we do a workaround is to create new display context directly and re-init
-        // keyboard layout with this context.
-        final WindowManager wm = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
-        return createDisplayContext(wm.getDefaultDisplay());
+    override fun onCreate() {
+        super.onCreate()
+        mInputMethodManager = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+        mWordSeparators = resources.getString(R.string.word_separators)
     }
 
-    /**
-     * This is the point where you can do all of your UI initialization.  It
-     * is called after creation and any configuration change.
-     */
-    @Override public void onInitializeInterface() {
-        final Context displayContext = getDisplayContext();
-        if (russianKeyboard != null) {
-            // Configuration changes can happen after the keyboard gets recreated,
-            // so we need to be able to re-build the keyboards if the available
-            // space has changed.
-            int displayWidth = getMaxWidth();
-            if (displayWidth == mLastDisplayWidth) return;
-            mLastDisplayWidth = displayWidth;
+    private val displayContext: Context
+        get() {
+            val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+            return createDisplayContext(wm.defaultDisplay)
         }
-        russianKeyboard = new LatinKeyboard(displayContext, R.xml.russian_keys_layout);
-        englishKeyboard = new LatinKeyboard(displayContext, R.xml.english_keys_layout);
-        mSymbolsKeyboard = new LatinKeyboard(displayContext, R.xml.symbols_keys_layout);
-        mSymbolsShiftedKeyboard = new LatinKeyboard(displayContext, R.xml.symbols_shift_keys_layout);
-        digitsKeyboard = new LatinKeyboard(displayContext, R.xml.digits_keys_layout);
+
+    override fun onInitializeInterface() {
+        val displayContext = displayContext
+        if (russianKeyboard != null) {
+            val displayWidth = maxWidth
+            if (displayWidth == mLastDisplayWidth) return
+            mLastDisplayWidth = displayWidth
+        }
+        russianKeyboard = LatinKeyboard(displayContext, R.xml.russian_keys_layout)
+        englishKeyboard = LatinKeyboard(displayContext, R.xml.english_keys_layout)
+        mSymbolsKeyboard = LatinKeyboard(displayContext, R.xml.symbols_keys_layout)
+        mSymbolsShiftedKeyboard = LatinKeyboard(displayContext, R.xml.symbols_shift_keys_layout)
+        digitsKeyboard = LatinKeyboard(displayContext, R.xml.digits_keys_layout)
     }
 
-    /**
-     * Called by the framework when your view for creating input needs to
-     * be generated.  This will be called the first time your input method
-     * is displayed, and every time it needs to be re-created such as due to
-     * a configuration change.
-     */
-    @Override public View onCreateInputView() {
-        mInputView = (LatinKeyboardView) getLayoutInflater().inflate(R.layout.input, null);
-        mInputView.setOnKeyboardActionListener(this);
-        setLatinKeyboard(russianKeyboard);
-        return mInputView;
+    override fun onCreateInputView(): View {
+        mInputView = layoutInflater.inflate(R.layout.input, null) as LatinKeyboardView
+        mInputView?.setOnKeyboardActionListener(this)
+        setLatinKeyboard(russianKeyboard)
+        return mInputView!!
     }
-    private void setLatinKeyboard(LatinKeyboard nextKeyboard) {
-//        final boolean shouldSupportLanguageSwitchKey =
-//                mInputMethodManager.shouldOfferSwitchingToNextInputMethod(getToken());
-//        nextKeyboard.setLanguageSwitchKeyVisibility(shouldSupportLanguageSwitchKey);
-        mInputView.setKeyboard(nextKeyboard);
-    }
-    /**
-     * Called by the framework when your view for showing candidates needs to
-     * be generated, like {@link #onCreateInputView}.
-     */
-    @Override public View onCreateCandidatesView() {
-        mCandidateView = new CandidateView(getDisplayContext());
-        mCandidateView.setService(this);
-        return mCandidateView;
-    }
-    /**
-     * This is the main point where we do our initialization of the input method
-     * to begin operating on an application.  At this point we have been
-     * bound to the client, and are now receiving all of the detailed information
-     * about the target of our edits.
-     */
-    @Override public void onStartInput(EditorInfo attribute, boolean restarting) {
-        super.onStartInput(attribute, restarting);
 
-        // Reset our state.  We want to do this even if restarting, because
-        // the underlying state of the text editor could have changed in any way.
-        mComposing.setLength(0);
-        updateCandidates();
+    private fun setLatinKeyboard(nextKeyboard: LatinKeyboard?) {
+        mInputView?.keyboard = nextKeyboard
+    }
+
+    override fun onCreateCandidatesView(): View {
+        mCandidateView = CandidateView(displayContext)
+        mCandidateView?.setService(this)
+        return mCandidateView!!
+    }
+
+    override fun onStartInput(attribute: EditorInfo, restarting: Boolean) {
+        super.onStartInput(attribute, restarting)
+
+        mComposing.setLength(0)
+        updateCandidates()
 
         if (!restarting) {
-            // Clear shift states.
-            mMetaState = 0;
+            mMetaState = 0
         }
 
-        mPredictionOn = false;
-        mCompletionOn = false;
-        mCompletions = null;
+        mPredictionOn = false
+        mCompletionOn = false
+        mCompletions = null
 
-        // We are now going to initialize our state based on the type of
-        // text being edited.
-        switch (attribute.inputType & InputType.TYPE_MASK_CLASS) {
-            case InputType.TYPE_CLASS_NUMBER:
-            case InputType.TYPE_CLASS_DATETIME:
-                // Numbers and dates default to the symbols keyboard, with
-                // no extra features.
-                mCurKeyboard = digitsKeyboard;
-                break;
+        when (attribute.inputType and InputType.TYPE_MASK_CLASS) {
+            InputType.TYPE_CLASS_NUMBER, InputType.TYPE_CLASS_DATETIME, InputType.TYPE_CLASS_PHONE -> {
+                mCurKeyboard = digitsKeyboard
+            }
+            InputType.TYPE_CLASS_TEXT -> {
+                mCurKeyboard = russianKeyboard
+                mPredictionOn = true
 
-            case InputType.TYPE_CLASS_PHONE:
-                // Phones will also default to the symbols keyboard, though
-                // often you will want to have a dedicated phone keyboard.
-                mCurKeyboard = digitsKeyboard;
-                break;
-
-            case InputType.TYPE_CLASS_TEXT:
-                // This is general text editing.  We will default to the
-                // normal alphabetic keyboard, and assume that we should
-                // be doing predictive text (showing candidates as the
-                // user types).
-                mCurKeyboard = russianKeyboard;
-                mPredictionOn = true;
-
-                // We now look for a few special variations of text that will
-                // modify our behavior.
-                int variation = attribute.inputType & InputType.TYPE_MASK_VARIATION;
+                val variation = attribute.inputType and InputType.TYPE_MASK_VARIATION
                 if (variation == InputType.TYPE_TEXT_VARIATION_PASSWORD ||
-                        variation == InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD) {
-                    // Do not display predictions / what the user is typing
-                    // when they are entering a password.
-                    mPredictionOn = false;
+                    variation == InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+                ) {
+                    mPredictionOn = false
                 }
 
-                if (variation == InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
-                        || variation == InputType.TYPE_TEXT_VARIATION_URI
-                        || variation == InputType.TYPE_TEXT_VARIATION_FILTER) {
-                    // Our predictions are not useful for e-mail addresses
-                    // or URIs.
-                    mPredictionOn = false;
+                if (variation == InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS ||
+                    variation == InputType.TYPE_TEXT_VARIATION_URI ||
+                    variation == InputType.TYPE_TEXT_VARIATION_FILTER
+                ) {
+                    mPredictionOn = false
                 }
 
-                if ((attribute.inputType & InputType.TYPE_TEXT_FLAG_AUTO_COMPLETE) != 0) {
-                    // If this is an auto-complete text view, then our predictions
-                    // will not be shown and instead we will allow the editor
-                    // to supply their own.  We only show the editor's
-                    // candidates when in fullscreen mode, otherwise relying
-                    // own it displaying its own UI.
-                    mPredictionOn = false;
-                    mCompletionOn = isFullscreenMode();
+                if ((attribute.inputType and InputType.TYPE_TEXT_FLAG_AUTO_COMPLETE) != 0) {
+                    mPredictionOn = false
+                    mCompletionOn = isFullscreenMode
                 }
 
-                // We also want to look at the current state of the editor
-                // to decide whether our alphabetic keyboard should start out
-                // shifted.
-                updateShiftKeyState(attribute);
-                break;
-
-            default:
-                // For all unknown input types, default to the alphabetic
-                // keyboard with no special features.
-                mCurKeyboard = englishKeyboard;
-                updateShiftKeyState(attribute);
-        }
-
-        // Update the label on the enter key, depending on what the application
-        // says it will do.
-        mCurKeyboard.setImeOptions(getResources(), attribute.imeOptions);
-    }
-    /**
-     * This is called when the user is done editing a field.  We can use
-     * this to reset our state.
-     */
-    @Override public void onFinishInput() {
-        super.onFinishInput();
-
-        // Clear current composing text and candidates.
-        mComposing.setLength(0);
-        updateCandidates();
-
-        // We only hide the candidates window when finishing input on
-        // a particular editor, to avoid popping the underlying application
-        // up and down if the user is entering text into the bottom of
-        // its window.
-        setCandidatesViewShown(false);
-
-        mCurKeyboard = russianKeyboard;
-
-        if (mInputView != null) {
-            mInputView.closing();
-        }
-    }
-
-    @Override public void onStartInputView(EditorInfo attribute, boolean restarting) {
-        super.onStartInputView(attribute, restarting);
-        // Apply the selected keyboard to the input view.
-        setLatinKeyboard(mCurKeyboard);
-        mInputView.closing();
-        final InputMethodSubtype subtype = mInputMethodManager.getCurrentInputMethodSubtype();
-        mInputView.setSubtypeOnSpaceKey(subtype);
-    }
-    @Override
-    public void onCurrentInputMethodSubtypeChanged(InputMethodSubtype subtype) {
-        mInputView.setSubtypeOnSpaceKey(subtype);
-    }
-    /**
-     * Deal with the editor reporting movement of its cursor.
-     */
-    @Override public void onUpdateSelection(int oldSelStart, int oldSelEnd,
-                                            int newSelStart, int newSelEnd,
-                                            int candidatesStart, int candidatesEnd) {
-        super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd,
-                candidatesStart, candidatesEnd);
-
-        // If the current selection in the text view changes, we should
-        // clear whatever candidate text we have.
-        if (mComposing.length() > 0 && (newSelStart != candidatesEnd
-                || newSelEnd != candidatesEnd)) {
-            mComposing.setLength(0);
-            updateCandidates();
-            InputConnection ic = getCurrentInputConnection();
-            if (ic != null) {
-                ic.finishComposingText();
+                updateShiftKeyState(attribute)
+            }
+            else -> {
+                mCurKeyboard = englishKeyboard
+                updateShiftKeyState(attribute)
             }
         }
+
+        mCurKeyboard?.setImeOptions(resources, attribute.imeOptions)
     }
-    /**
-     * This tells us about completions that the editor has determined based
-     * on the current text in it.  We want to use this in fullscreen mode
-     * to show the completions ourself, since the editor can not be seen
-     * in that situation.
-     */
-    @Override public void onDisplayCompletions(CompletionInfo[] completions) {
+
+    override fun onFinishInput() {
+        super.onFinishInput()
+
+        mComposing.setLength(0)
+        updateCandidates()
+        setCandidatesViewShown(false)
+
+        mCurKeyboard = russianKeyboard
+        mInputView?.closing()
+    }
+
+    override fun onStartInputView(attribute: EditorInfo, restarting: Boolean) {
+        super.onStartInputView(attribute, restarting)
+        setLatinKeyboard(mCurKeyboard)
+        mInputView?.closing()
+        val subtype = mInputMethodManager?.currentInputMethodSubtype
+        subtype?.let { mInputView?.setSubtypeOnSpaceKey(it) }
+    }
+
+    override fun onCurrentInputMethodSubtypeChanged(subtype: android.view.inputmethod.InputMethodSubtype?) {
+        subtype?.let { mInputView?.setSubtypeOnSpaceKey(it) }
+    }
+
+    override fun onUpdateSelection(
+        oldSelStart: Int, oldSelEnd: Int,
+        newSelStart: Int, newSelEnd: Int,
+        candidatesStart: Int, candidatesEnd: Int
+    ) {
+        super.onUpdateSelection(
+            oldSelStart, oldSelEnd, newSelStart, newSelEnd,
+            candidatesStart, candidatesEnd
+        )
+
+        if (mComposing.isNotEmpty() && (newSelStart != candidatesEnd || newSelEnd != candidatesEnd)) {
+            mComposing.setLength(0)
+            updateCandidates()
+            currentInputConnection?.finishComposingText()
+        }
+    }
+
+    override fun onDisplayCompletions(completions: Array<CompletionInfo>?) {
         if (mCompletionOn) {
-            mCompletions = completions;
+            mCompletions = completions
             if (completions == null) {
-                setSuggestions(null, false, false);
-                return;
+                setSuggestions(null, completions = false, typedWordValid = false)
+                return
             }
 
-            List<String> stringList = new ArrayList<String>();
-            for (int i = 0; i < completions.length; i++) {
-                CompletionInfo ci = completions[i];
-                if (ci != null) stringList.add(ci.getText().toString());
-            }
-            setSuggestions(stringList, true, true);
+            val stringList = completions.mapNotNull { it.text?.toString() }
+            setSuggestions(stringList, completions = true, typedWordValid = true)
         }
     }
 
-    /**
-     * This translates incoming hard key events in to edit operations on an
-     * InputConnection.  It is only needed when using the
-     * PROCESS_HARD_KEYS option.
-     */
-    private boolean translateKeyDown(int keyCode, KeyEvent event) {
-        mMetaState = MetaKeyKeyListener.handleKeyDown(mMetaState,
-                keyCode, event);
-        int c = event.getUnicodeChar(MetaKeyKeyListener.getMetaState(mMetaState));
-        mMetaState = MetaKeyKeyListener.adjustMetaAfterKeypress(mMetaState);
-        InputConnection ic = getCurrentInputConnection();
-        if (c == 0 || ic == null) {
-            return false;
+    private fun translateKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        mMetaState = MetaKeyKeyListener.handleKeyDown(mMetaState, keyCode, event)
+        var c = event.getUnicodeChar(MetaKeyKeyListener.getMetaState(mMetaState))
+        mMetaState = MetaKeyKeyListener.adjustMetaAfterKeypress(mMetaState)
+        val ic = currentInputConnection
+        if (c == 0 || ic == null) return false
+
+        if (c and android.view.KeyCharacterMap.COMBINING_ACCENT != 0) {
+            c = c and android.view.KeyCharacterMap.COMBINING_ACCENT_MASK
         }
 
-        boolean dead = false;
-        if ((c & KeyCharacterMap.COMBINING_ACCENT) != 0) {
-            dead = true;
-            c = c & KeyCharacterMap.COMBINING_ACCENT_MASK;
-        }
-
-        if (mComposing.length() > 0) {
-            char accent = mComposing.charAt(mComposing.length() -1 );
-            int composed = KeyEvent.getDeadChar(accent, c);
+        if (mComposing.isNotEmpty()) {
+            val accent = mComposing[mComposing.length - 1]
+            val composed = KeyEvent.getDeadChar(accent.toInt(), c)
             if (composed != 0) {
-                c = composed;
-                mComposing.setLength(mComposing.length()-1);
+                c = composed
+                mComposing.setLength(mComposing.length - 1)
             }
         }
 
-        onKey(c, null);
-
-        return true;
+        onKey(c, null)
+        return true
     }
 
-    /**
-     * Use this to monitor key events being delivered to the application.
-     * We get first crack at them, and can either resume them or let them
-     * continue to the app.
-     */
-    @Override public boolean onKeyDown(int keyCode, KeyEvent event) {
-        switch (keyCode) {
-            case KeyEvent.KEYCODE_BACK:
-                // The InputMethodService already takes care of the back
-                // key for us, to dismiss the input method if it is shown.
-                // However, our keyboard could be showing a pop-up window
-                // that back should dismiss, so we first allow it to do that.
-                if (event.getRepeatCount() == 0 && mInputView != null) {
-                    if (mInputView.handleBack()) {
-                        return true;
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        when (keyCode) {
+            KeyEvent.KEYCODE_BACK -> {
+                if (event.repeatCount == 0 && mInputView != null) {
+                    if (mInputView!!.handleBack()) return true
+                }
+            }
+            KeyEvent.KEYCODE_DEL -> {
+                if (mComposing.isNotEmpty()) {
+                    onKey(Keyboard.KEYCODE_DELETE, null)
+                    return true
+                }
+            }
+            KeyEvent.KEYCODE_ENTER -> return false
+            else -> if (PROCESS_HARD_KEYS) {
+                if (keyCode == KeyEvent.KEYCODE_SPACE && (event.metaState and KeyEvent.META_ALT_ON) != 0) {
+                    val ic = currentInputConnection
+                    if (ic != null) {
+                        ic.clearMetaKeyStates(KeyEvent.META_ALT_ON)
+                        "android".forEach { keyDownUp(getRawKeyCodeForChar(it.toInt())) }
+                        return true
                     }
                 }
-                break;
-
-            case KeyEvent.KEYCODE_DEL:
-                // Special handling of the delete key: if we currently are
-                // composing text for the user, we want to modify that instead
-                // of let the application to the delete itself.
-                if (mComposing.length() > 0) {
-                    onKey(Keyboard.KEYCODE_DELETE, null);
-                    return true;
-                }
-                break;
-
-            case KeyEvent.KEYCODE_ENTER:
-                // Let the underlying text editor always handle these.
-                return false;
-
-            default:
-                // For all other keys, if we want to do transformations on
-                // text being entered with a hard keyboard, we need to process
-                // it and do the appropriate action.
-                if (PROCESS_HARD_KEYS) {
-                    if (keyCode == KeyEvent.KEYCODE_SPACE
-                            && (event.getMetaState() & KeyEvent.META_ALT_ON) != 0) {
-                        // A silly example: in our input method, Alt+Space
-                        // is a shortcut for 'android' in lower case.
-                        InputConnection ic = getCurrentInputConnection();
-                        if (ic != null) {
-                            // First, tell the editor that it is no longer in the
-                            // shift state, since we are consuming this.
-                            ic.clearMetaKeyStates(KeyEvent.META_ALT_ON);
-                            keyDownUp(KeyEvent.KEYCODE_A);
-                            keyDownUp(KeyEvent.KEYCODE_N);
-                            keyDownUp(KeyEvent.KEYCODE_D);
-                            keyDownUp(KeyEvent.KEYCODE_R);
-                            keyDownUp(KeyEvent.KEYCODE_O);
-                            keyDownUp(KeyEvent.KEYCODE_I);
-                            keyDownUp(KeyEvent.KEYCODE_D);
-                            // And we consume this event.
-                            return true;
-                        }
-                    }
-                    if (mPredictionOn && translateKeyDown(keyCode, event)) {
-                        return true;
-                    }
-                }
-        }
-
-        return super.onKeyDown(keyCode, event);
-    }
-    /**
-     * Use this to monitor key events being delivered to the application.
-     * We get first crack at them, and can either resume them or let them
-     * continue to the app.
-     */
-    @Override public boolean onKeyUp(int keyCode, KeyEvent event) {
-        // If we want to do transformations on text being entered with a hard
-        // keyboard, we need to process the up events to update the meta key
-        // state we are tracking.
-        if (PROCESS_HARD_KEYS) {
-            if (mPredictionOn) {
-                mMetaState = MetaKeyKeyListener.handleKeyUp(mMetaState,
-                        keyCode, event);
+                if (mPredictionOn && translateKeyDown(keyCode, event)) return true
             }
         }
-
-        return super.onKeyUp(keyCode, event);
+        return super.onKeyDown(keyCode, event)
     }
-    /**
-     * Helper function to commit any text being composed in to the editor.
-     */
-    private void commitTyped(InputConnection inputConnection) {
-        if (mComposing.length() > 0) {
-            inputConnection.commitText(mComposing, mComposing.length());
-            mComposing.setLength(0);
-            updateCandidates();
+
+    private fun getRawKeyCodeForChar(c: Int): Int {
+        return when (c.toChar()) {
+            'a' -> KeyEvent.KEYCODE_A
+            'n' -> KeyEvent.KEYCODE_N
+            'd' -> KeyEvent.KEYCODE_D
+            'r' -> KeyEvent.KEYCODE_R
+            'o' -> KeyEvent.KEYCODE_O
+            'i' -> KeyEvent.KEYCODE_I
+            else -> 0
         }
     }
-    /**
-     * Helper to update the shift state of our keyboard based on the initial
-     * editor state.
-     */
-    private void updateShiftKeyState(EditorInfo attr) {
-        if (attr != null
-                && mInputView != null && (englishKeyboard == mInputView.getKeyboard() || russianKeyboard == mInputView.getKeyboard())) {
-            int caps = 0;
-            EditorInfo ei = getCurrentInputEditorInfo();
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        if (PROCESS_HARD_KEYS && mPredictionOn) {
+            mMetaState = MetaKeyKeyListener.handleKeyUp(mMetaState, keyCode, event)
+        }
+        return super.onKeyUp(keyCode, event)
+    }
+
+    private fun commitTyped(inputConnection: InputConnection) {
+        if (mComposing.isNotEmpty()) {
+            inputConnection.commitText(mComposing, mComposing.length)
+            mComposing.setLength(0)
+            updateCandidates()
+        }
+    }
+
+    private fun updateShiftKeyState(attr: EditorInfo?) {
+        if (attr != null && mInputView != null && (englishKeyboard == mInputView?.keyboard || russianKeyboard == mInputView?.keyboard)) {
+            var caps = 0
+            val ei = currentInputEditorInfo
             if (ei != null && ei.inputType != InputType.TYPE_NULL) {
-                caps = getCurrentInputConnection().getCursorCapsMode(attr.inputType);
+                caps = currentInputConnection.getCursorCapsMode(attr.inputType)
             }
-            mInputView.setShifted(mCapsLock || caps != 0);
+            mInputView?.isShifted = mCapsLock || caps != 0
         }
     }
 
-    /**
-     * Helper to determine if a given character code is alphabetic.
-     */
-    private boolean isAlphabet(int code) {
-        if (Character.isLetter(code)) {
-            return true;
-        } else {
-            return false;
-        }
+    private fun keyDownUp(keyEventCode: Int) {
+        currentInputConnection.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyEventCode))
+        currentInputConnection.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, keyEventCode))
     }
 
-    /**
-     * Helper to send a key down / key up pair to the current editor.
-     */
-    private void keyDownUp(int keyEventCode) {
-        getCurrentInputConnection().sendKeyEvent(
-                new KeyEvent(KeyEvent.ACTION_DOWN, keyEventCode));
-        getCurrentInputConnection().sendKeyEvent(
-                new KeyEvent(KeyEvent.ACTION_UP, keyEventCode));
-    }
-
-    /**
-     * Helper to send a character to the editor as raw key events.
-     */
-    private void sendKey(int keyCode) {
-        switch (keyCode) {
-            case '\n':
-                keyDownUp(KeyEvent.KEYCODE_ENTER);
-                break;
-            default:
-                if (keyCode >= '0' && keyCode <= '9') {
-                    keyDownUp(keyCode - '0' + KeyEvent.KEYCODE_0);
+    private fun sendKey(keyCode: Int) {
+        when (keyCode) {
+            '\n'.toInt() -> keyDownUp(KeyEvent.KEYCODE_ENTER)
+            else -> {
+                if (keyCode >= '0'.toInt() && keyCode <= '9'.toInt()) {
+                    keyDownUp(keyCode - '0'.toInt() + KeyEvent.KEYCODE_0)
                 } else {
-                    getCurrentInputConnection().commitText(String.valueOf((char) keyCode), 1);
+                    currentInputConnection.commitText(keyCode.toChar().toString(), 1)
                 }
-                break;
+            }
         }
     }
-    // Implementation of KeyboardViewListener
-    public void onKey(int primaryCode, int[] keyCodes) {
+
+    override fun onKey(primaryCode: Int, keyCodes: IntArray?) {
         if (isWordSeparator(primaryCode)) {
-            // Handle separator
-            if (mComposing.length() > 0) {
-                commitTyped(getCurrentInputConnection());
-            }
-            sendKey(primaryCode);
-            updateShiftKeyState(getCurrentInputEditorInfo());
+            if (mComposing.isNotEmpty()) commitTyped(currentInputConnection)
+            sendKey(primaryCode)
+            updateShiftKeyState(currentInputEditorInfo)
         } else if (primaryCode == Keyboard.KEYCODE_DELETE) {
-            handleBackspace();
+            handleBackspace()
         } else if (primaryCode == Keyboard.KEYCODE_SHIFT) {
-            handleShift();
+            handleShift()
         } else if (primaryCode == Keyboard.KEYCODE_CANCEL) {
-            handleClose();
-            return;
+            handleClose()
         } else if (primaryCode == LatinKeyboardView.KEYCODE_LANGUAGE_SWITCH) {
-//            handleLanguageSwitch();
-
-            Keyboard current = mInputView.getKeyboard();
-
+            val current = mInputView?.keyboard
             if (current == russianKeyboard) {
-                setLatinKeyboard(englishKeyboard);
+                setLatinKeyboard(englishKeyboard)
             } else {
-                setLatinKeyboard(russianKeyboard);
+                setLatinKeyboard(russianKeyboard)
             }
-
-            return;
-        } else if (primaryCode == LatinKeyboardView.KEYCODE_OPTIONS) {
-            // Show a menu or somethin'
         } else if (primaryCode == Keyboard.KEYCODE_MODE_CHANGE && mInputView != null) {
-            Keyboard current = mInputView.getKeyboard();
-
+            val current = mInputView?.keyboard
             if (current == mSymbolsKeyboard || current == mSymbolsShiftedKeyboard) {
-                setLatinKeyboard(russianKeyboard);
+                setLatinKeyboard(russianKeyboard)
             } else {
-                setLatinKeyboard(mSymbolsKeyboard);
-                mSymbolsKeyboard.setShifted(false);
+                setLatinKeyboard(mSymbolsKeyboard)
+                mSymbolsKeyboard?.isShifted = false
             }
         } else if (primaryCode == LatinKeyboardView.KEYCODE_MODE_2_CHANGE && mInputView != null) {
-            Keyboard current = mInputView.getKeyboard();
-
+            val current = mInputView?.keyboard
             if (current == mSymbolsKeyboard) {
-                setLatinKeyboard(mSymbolsShiftedKeyboard);
+                setLatinKeyboard(mSymbolsShiftedKeyboard)
             } else {
-                setLatinKeyboard(mSymbolsKeyboard);
+                setLatinKeyboard(mSymbolsKeyboard)
             }
         } else if (primaryCode == LatinKeyboardView.KEYCODE_MODE_3_CHANGE && mInputView != null) {
-            Keyboard current = mInputView.getKeyboard();
-
+            val current = mInputView?.keyboard
             if (current == mSymbolsKeyboard || current == mSymbolsShiftedKeyboard) {
-                setLatinKeyboard(digitsKeyboard);
+                setLatinKeyboard(digitsKeyboard)
             } else {
-                setLatinKeyboard(mSymbolsKeyboard);
+                setLatinKeyboard(mSymbolsKeyboard)
             }
         } else if (primaryCode == LatinKeyboardView.KEYCODE_MODE_4_CHANGE && mInputView != null) {
-            Keyboard current = mInputView.getKeyboard();
-
+            val current = mInputView?.keyboard
             if (current == mSymbolsKeyboard || current == mSymbolsShiftedKeyboard || current == digitsKeyboard) {
-                setLatinKeyboard(russianKeyboard);
+                setLatinKeyboard(russianKeyboard)
             }
         } else {
-            handleCharacter(primaryCode, keyCodes);
+            handleCharacter(primaryCode, keyCodes)
         }
     }
-    public void onText(CharSequence text) {
-        InputConnection ic = getCurrentInputConnection();
-        if (ic == null) return;
-        ic.beginBatchEdit();
-        if (mComposing.length() > 0) {
-            commitTyped(ic);
-        }
-        ic.commitText(text, 0);
-        ic.endBatchEdit();
-        updateShiftKeyState(getCurrentInputEditorInfo());
+
+    override fun onText(text: CharSequence) {
+        val ic = currentInputConnection ?: return
+        ic.beginBatchEdit()
+        if (mComposing.isNotEmpty()) commitTyped(ic)
+        ic.commitText(text, 0)
+        ic.endBatchEdit()
+        updateShiftKeyState(currentInputEditorInfo)
     }
-    /**
-     * Update the list of available candidates from the current composing
-     * text.  This will need to be filled in by however you are determining
-     * candidates.
-     */
-    private void updateCandidates() {
+
+    private fun updateCandidates() {
         if (!mCompletionOn) {
-            if (mComposing.length() > 0) {
-                ArrayList<String> list = new ArrayList<String>();
-                list.add(mComposing.toString());
-                setSuggestions(list, true, true);
+            if (mComposing.isNotEmpty()) {
+                setSuggestions(listOf(mComposing.toString()), completions = true, typedWordValid = true)
             } else {
-                setSuggestions(null, false, false);
+                setSuggestions(null, completions = false, typedWordValid = false)
             }
         }
     }
 
-    public void setSuggestions(List<String> suggestions, boolean completions,
-                               boolean typedWordValid) {
-        if (suggestions != null && suggestions.size() > 0) {
-            setCandidatesViewShown(true);
-        } else if (isExtractViewShown()) {
-            setCandidatesViewShown(true);
+    fun setSuggestions(suggestions: List<String>?, completions: Boolean, typedWordValid: Boolean) {
+        if (!suggestions.isNullOrEmpty() || isExtractViewShown) {
+            setCandidatesViewShown(true)
         }
-        if (mCandidateView != null) {
-            mCandidateView.setSuggestions(suggestions, completions, typedWordValid);
-        }
+        mCandidateView?.setSuggestions(suggestions, completions, typedWordValid)
     }
 
-    private void handleBackspace() {
-        final int length = mComposing.length();
+    private fun handleBackspace() {
+        val length = mComposing.length
         if (length > 1) {
-            mComposing.delete(length - 1, length);
-            getCurrentInputConnection().setComposingText(mComposing, 1);
-            updateCandidates();
+            mComposing.delete(length - 1, length)
+            currentInputConnection.setComposingText(mComposing, 1)
+            updateCandidates()
         } else if (length > 0) {
-            mComposing.setLength(0);
-            getCurrentInputConnection().commitText("", 0);
-            updateCandidates();
+            mComposing.setLength(0)
+            currentInputConnection.commitText("", 0)
+            updateCandidates()
         } else {
-            keyDownUp(KeyEvent.KEYCODE_DEL);
+            keyDownUp(KeyEvent.KEYCODE_DEL)
         }
-        updateShiftKeyState(getCurrentInputEditorInfo());
+        updateShiftKeyState(currentInputEditorInfo)
     }
-    private void handleShift() {
-        if (mInputView == null) {
-            return;
-        }
 
-        Keyboard currentKeyboard = mInputView.getKeyboard();
-
-        if (russianKeyboard == currentKeyboard) {
-            // Alphabet keyboard
-            checkToggleCapsLock();
-            mInputView.setShifted(mCapsLock || !mInputView.isShifted());
-        } else if (englishKeyboard == currentKeyboard) {
-            // Alphabet keyboard
-            checkToggleCapsLock();
-            mInputView.setShifted(mCapsLock || !mInputView.isShifted());
+    private fun handleShift() {
+        val currentKeyboard = mInputView?.keyboard
+        if (russianKeyboard == currentKeyboard || englishKeyboard == currentKeyboard) {
+            checkToggleCapsLock()
+            mInputView?.isShifted = mCapsLock || !mInputView!!.isShifted
         } else if (currentKeyboard == mSymbolsKeyboard) {
-            mSymbolsKeyboard.setShifted(true);
-            setLatinKeyboard(mSymbolsShiftedKeyboard);
-            mSymbolsShiftedKeyboard.setShifted(true);
+            mSymbolsKeyboard?.isShifted = true
+            setLatinKeyboard(mSymbolsShiftedKeyboard)
+            mSymbolsShiftedKeyboard?.isShifted = true
         } else if (currentKeyboard == mSymbolsShiftedKeyboard) {
-            mSymbolsShiftedKeyboard.setShifted(false);
-            setLatinKeyboard(mSymbolsKeyboard);
-            mSymbolsKeyboard.setShifted(false);
+            mSymbolsShiftedKeyboard?.isShifted = false
+            setLatinKeyboard(mSymbolsKeyboard)
+            mSymbolsKeyboard?.isShifted = false
         }
     }
 
-    private void handleCharacter(int primaryCode, int[] keyCodes) {
-        if (isInputViewShown()) {
-            if (mInputView.isShifted()) {
-                primaryCode = Character.toUpperCase(primaryCode);
-            }
+    private fun handleCharacter(primaryCode: Int, keyCodes: IntArray?) {
+        var code = primaryCode
+        if (isInputViewShown && mInputView!!.isShifted) {
+            code = Character.toUpperCase(code)
         }
-//        if (isAlphabet(primaryCode) && mPredictionOn) {
-            mComposing.append((char) primaryCode);
-            getCurrentInputConnection().setComposingText(mComposing, 1);
-            updateShiftKeyState(getCurrentInputEditorInfo());
-            updateCandidates();
-//        } else {
-//            getCurrentInputConnection().commitText(
-//                    String.valueOf((char) primaryCode), 1);
-//        }
+        mComposing.append(code.toChar())
+        currentInputConnection.setComposingText(mComposing, 1)
+        updateShiftKeyState(currentInputEditorInfo)
+        updateCandidates()
     }
-    private void handleClose() {
-        commitTyped(getCurrentInputConnection());
-        requestHideSelf(0);
-        mInputView.closing();
+
+    private fun handleClose() {
+        commitTyped(currentInputConnection)
+        requestHideSelf(0)
+        mInputView?.closing()
     }
-    private IBinder getToken() {
-        final Dialog dialog = getWindow();
-        if (dialog == null) {
-            return null;
-        }
-        final Window window = dialog.getWindow();
-        if (window == null) {
-            return null;
-        }
-        return window.getAttributes().token;
-    }
-    private void handleLanguageSwitch() {
-        mInputMethodManager.switchToNextInputMethod(getToken(), false /* onlyCurrentIme */);
-    }
-    private void checkToggleCapsLock() {
-        long now = System.currentTimeMillis();
+
+    private fun checkToggleCapsLock() {
+        val now = System.currentTimeMillis()
         if (mLastShiftTime + 800 > now) {
-            mCapsLock = !mCapsLock;
-            mLastShiftTime = 0;
+            mCapsLock = !mCapsLock
+            mLastShiftTime = 0
         } else {
-            mLastShiftTime = now;
+            mLastShiftTime = now
         }
     }
 
-    private String getWordSeparators() {
-        return mWordSeparators;
+    private fun isWordSeparator(code: Int): Boolean {
+        return mWordSeparators?.contains(code.toChar()) == true
     }
 
-    public boolean isWordSeparator(int code) {
-        String separators = getWordSeparators();
-        return separators.contains(String.valueOf((char)code));
-    }
-    public void pickDefaultCandidate() {
-        pickSuggestionManually(0);
-    }
-
-    public void pickSuggestionManually(int index) {
-        if (mCompletionOn && mCompletions != null && index >= 0
-                && index < mCompletions.length) {
-            CompletionInfo ci = mCompletions[index];
-            getCurrentInputConnection().commitCompletion(ci);
-            if (mCandidateView != null) {
-                mCandidateView.clear();
-            }
-            updateShiftKeyState(getCurrentInputEditorInfo());
-        } else if (mComposing.length() > 0) {
-            // If we were generating candidate suggestions for the current
-            // text, we would commit one of them here.  But for this sample,
-            // we will just commit the current text.
-            commitTyped(getCurrentInputConnection());
+    fun pickSuggestionManually(index: Int) {
+        if (mCompletionOn && mCompletions != null && index >= 0 && index < mCompletions!!.size) {
+            val ci = mCompletions!![index]
+            currentInputConnection.commitCompletion(ci)
+            mCandidateView?.clear()
+            updateShiftKeyState(currentInputEditorInfo)
+        } else if (mComposing.isNotEmpty()) {
+            commitTyped(currentInputConnection)
         }
     }
 
-    public void swipeRight() {
-        if (mCompletionOn) {
-            pickDefaultCandidate();
-        }
+    override fun swipeRight() {
+        if (mCompletionOn) pickSuggestionManually(0)
     }
 
-    public void swipeLeft() {
-        handleBackspace();
-    }
-    public void swipeDown() {
-        handleClose();
-    }
-    public void swipeUp() {
-    }
+    override fun swipeLeft() = handleBackspace()
+    override fun swipeDown() = handleClose()
+    override fun swipeUp() {}
+    override fun onPress(primaryCode: Int) {}
+    override fun onRelease(primaryCode: Int) {}
 
-    public void onPress(int primaryCode) {
-    }
-
-    public void onRelease(int primaryCode) {
+    companion object {
+        const val PROCESS_HARD_KEYS = true
     }
 }
