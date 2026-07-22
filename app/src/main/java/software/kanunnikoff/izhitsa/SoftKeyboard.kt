@@ -116,6 +116,20 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         }
     }
 
+    /**
+     * Разрешает показывать панель ввода даже при подключённой аппаратной клавиатуре.
+     *
+     * Стандартная реализация [InputMethodService] скрывает экранную панель, если система
+     * обнаружила аппаратную клавиатуру и пользователь не включил общий параметр её
+     * одновременного показа. Для метода ввода, который пользователь выбрал явно, такое
+     * поведение выглядит как отказ запуска, поэтому панель всегда остаётся доступной.
+     */
+    override fun onEvaluateInputViewShown(): Boolean {
+        super.onEvaluateInputViewShown()
+
+        return true
+    }
+
     override fun onCreateCandidatesView(): View {
         mCandidateView = CandidateView(displayContext)
         mCandidateView?.setService(this)

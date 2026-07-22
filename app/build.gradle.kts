@@ -1,18 +1,17 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.firebase.crashlytics)
     alias(libs.plugins.compose.compiler)
 }
 
 android {
     namespace = "software.kanunnikoff.izhitsa"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "software.kanunnikoff.izhitsa"
         minSdk = 26
-        targetSdk = 36
+        targetSdk = 37
         versionCode = 5
         versionName = "1.1.3"
 
@@ -33,12 +32,6 @@ android {
 
     buildFeatures {
         compose = true
-    }
-}
-
-tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile>().configureEach {
-    compilerOptions {
-        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
 
