@@ -36,12 +36,12 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.Backspace
 import androidx.compose.material.icons.automirrored.rounded.KeyboardReturn
 import androidx.compose.material.icons.automirrored.rounded.Send
+import androidx.compose.material.icons.outlined.EmojiEmotions
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.Collections
 import androidx.compose.material.icons.rounded.Done
-import androidx.compose.material.icons.rounded.EmojiEmotions
 import androidx.compose.material.icons.rounded.Face
 import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Search
@@ -70,11 +70,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -94,11 +96,17 @@ data class KeyInfo(
     val label: String? = null,
     val icon: KeyIcon? = null,
     val hint: String? = null,
+    val hintIcon: KeyIcon? = null,
     val alternatives: List<String> = emptyList(),
+    val longPressAction: KeyLongPressAction? = null,
     val weight: Float = 1f,
     val isModifier: Boolean = false,
     val isActive: Boolean = false
 )
+
+enum class KeyLongPressAction {
+    SHOW_EMOJI
+}
 
 enum class KeyboardPanel {
     KEYS,
@@ -110,7 +118,6 @@ enum class KeyboardPanel {
 enum class KeyboardToolbarAction {
     SWITCH_INPUT_METHOD,
     STICKERS,
-    EMOJI,
     CLIPBOARD,
     SETTINGS
 }
@@ -124,6 +131,7 @@ fun KeyboardScreen(
     clipboardText: String?,
     supportsStickerContent: Boolean,
     onKeyClick: (KeyInfo) -> Unit,
+    onKeyLongPressAction: (KeyLongPressAction) -> Unit,
     onAlternativeSelected: (KeyInfo, String) -> Unit,
     onSuggestionClick: (String) -> Unit,
     onToolbarAction: (KeyboardToolbarAction) -> Unit,
@@ -156,6 +164,7 @@ fun KeyboardScreen(
                         rows = rows,
                         palette = palette,
                         onKeyClick = onKeyClick,
+                        onKeyLongPressAction = onKeyLongPressAction,
                         onAlternativeSelected = onAlternativeSelected
                     )
                 } else {
@@ -163,6 +172,7 @@ fun KeyboardScreen(
                         rows = rows,
                         palette = palette,
                         onKeyClick = onKeyClick,
+                        onKeyLongPressAction = onKeyLongPressAction,
                         onAlternativeSelected = onAlternativeSelected
                     )
                 }
@@ -343,13 +353,6 @@ private fun KeyboardToolbar(
             )
 
             ToolbarIcon(
-                imageVector = Icons.Rounded.EmojiEmotions,
-                contentDescription = "Эмодзи",
-                palette = palette,
-                onClick = { onToolbarAction(KeyboardToolbarAction.EMOJI) }
-            )
-
-            ToolbarIcon(
                 imageVector = Icons.Rounded.ContentPaste,
                 contentDescription = "Буфер обмена",
                 palette = palette,
@@ -418,6 +421,7 @@ private fun KeyboardRows(
     rows: List<List<KeyInfo>>,
     palette: KeyboardPalette,
     onKeyClick: (KeyInfo) -> Unit,
+    onKeyLongPressAction: (KeyLongPressAction) -> Unit,
     onAlternativeSelected: (KeyInfo, String) -> Unit
 ) {
     Column(
@@ -431,7 +435,7 @@ private fun KeyboardRows(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(KeyHeight),
-                horizontalArrangement = Arrangement.spacedBy(KeyGap)
+                horizontalArrangement = Arrangement.spacedBy(KeyHorizontalGap)
             ) {
                 row.forEach { key ->
                     KeyButton(
@@ -439,6 +443,7 @@ private fun KeyboardRows(
                         modifier = Modifier.weight(key.weight),
                         palette = palette,
                         onClick = { onKeyClick(key) },
+                        onLongPressAction = onKeyLongPressAction,
                         onAlternativeSelected = { alternative ->
                             onAlternativeSelected(key, alternative)
                         }
@@ -447,7 +452,7 @@ private fun KeyboardRows(
             }
 
             if (rowIndex != rows.lastIndex) {
-                Spacer(modifier = Modifier.height(KeyGap))
+                Spacer(modifier = Modifier.height(KeyVerticalGap))
             }
         }
     }
@@ -458,6 +463,7 @@ private fun NumberKeyboardRows(
     rows: List<List<KeyInfo>>,
     palette: KeyboardPalette,
     onKeyClick: (KeyInfo) -> Unit,
+    onKeyLongPressAction: (KeyLongPressAction) -> Unit,
     onAlternativeSelected: (KeyInfo, String) -> Unit
 ) {
     /*
@@ -481,7 +487,7 @@ private fun NumberKeyboardRows(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(NumberGridHeight),
-            horizontalArrangement = Arrangement.spacedBy(KeyGap)
+            horizontalArrangement = Arrangement.spacedBy(KeyHorizontalGap)
         ) {
             NumberOperatorColumn(
                 keys = operatorKeys,
@@ -492,14 +498,14 @@ private fun NumberKeyboardRows(
 
             Column(
                 modifier = Modifier.weight(NumberDigitGridWeight),
-                verticalArrangement = Arrangement.spacedBy(KeyGap)
+                verticalArrangement = Arrangement.spacedBy(KeyVerticalGap)
             ) {
                 digitRows.forEach { row ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f),
-                        horizontalArrangement = Arrangement.spacedBy(KeyGap)
+                        horizontalArrangement = Arrangement.spacedBy(KeyHorizontalGap)
                     ) {
                         row.forEach { key ->
                             KeyButton(
@@ -507,6 +513,7 @@ private fun NumberKeyboardRows(
                                 modifier = Modifier.weight(1f),
                                 palette = palette,
                                 onClick = { onKeyClick(key) },
+                                onLongPressAction = onKeyLongPressAction,
                                 onAlternativeSelected = { alternative ->
                                     onAlternativeSelected(key, alternative)
                                 }
@@ -518,7 +525,7 @@ private fun NumberKeyboardRows(
 
             Column(
                 modifier = Modifier.weight(NumberSideColumnWeight),
-                verticalArrangement = Arrangement.spacedBy(KeyGap)
+                verticalArrangement = Arrangement.spacedBy(KeyVerticalGap)
             ) {
                 sideKeys.forEach { key ->
                     KeyButton(
@@ -526,6 +533,7 @@ private fun NumberKeyboardRows(
                         modifier = Modifier.weight(1f),
                         palette = palette,
                         onClick = { onKeyClick(key) },
+                        onLongPressAction = onKeyLongPressAction,
                         onAlternativeSelected = { alternative ->
                             onAlternativeSelected(key, alternative)
                         }
@@ -534,13 +542,13 @@ private fun NumberKeyboardRows(
             }
         }
 
-        Spacer(modifier = Modifier.height(KeyGap))
+        Spacer(modifier = Modifier.height(KeyVerticalGap))
 
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(KeyHeight),
-            horizontalArrangement = Arrangement.spacedBy(KeyGap)
+            horizontalArrangement = Arrangement.spacedBy(KeyHorizontalGap)
         ) {
             bottomKeys.forEach { key ->
                 KeyButton(
@@ -548,6 +556,7 @@ private fun NumberKeyboardRows(
                     modifier = Modifier.weight(key.weight),
                     palette = palette,
                     onClick = { onKeyClick(key) },
+                    onLongPressAction = onKeyLongPressAction,
                     onAlternativeSelected = { alternative ->
                         onAlternativeSelected(key, alternative)
                     }
@@ -584,8 +593,9 @@ private fun NumberOperatorColumn(
                 Text(
                     text = key.label.orEmpty(),
                     color = palette.text,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Medium
+                    fontSize = KeyLabelFontSize,
+                    fontFamily = FontFamily.SansSerif,
+                    fontWeight = FontWeight.Normal
                 )
             }
         }
@@ -599,6 +609,7 @@ private fun KeyButton(
     modifier: Modifier = Modifier,
     palette: KeyboardPalette,
     onClick: () -> Unit,
+    onLongPressAction: (KeyLongPressAction) -> Unit,
     onAlternativeSelected: (String) -> Unit
 ) {
     val interactionSource = remember { MutableInteractionSource() }
@@ -634,9 +645,11 @@ private fun KeyButton(
                 interactionSource = interactionSource,
                 indication = null,
                 onClick = onClick,
+                onLongClickLabel = key.longPressAction?.contentDescription(),
                 onLongClick = {
-                    if (key.alternatives.isNotEmpty()) {
-                        alternativesVisible = true
+                    when {
+                        key.alternatives.isNotEmpty() -> alternativesVisible = true
+                        key.longPressAction != null -> onLongPressAction(key.longPressAction)
                     }
                 }
             ),
@@ -683,9 +696,16 @@ private fun KeyContent(
             Text(
                 text = label,
                 color = palette.text,
-                fontSize = if (label.length > 3) 14.sp else 20.sp,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier.align(Alignment.Center)
+                fontSize = key.labelFontSize(label = label),
+                fontFamily = FontFamily.SansSerif,
+                fontWeight = FontWeight.Normal,
+                modifier = if (key.hintIcon == null) {
+                    Modifier.align(Alignment.Center)
+                } else {
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = EmojiCommaLabelBottomPadding)
+                }
             )
         }
 
@@ -694,12 +714,34 @@ private fun KeyContent(
                 text = hint,
                 color = palette.textSecondary,
                 fontSize = 10.sp,
-                fontWeight = FontWeight.Medium,
+                fontFamily = FontFamily.SansSerif,
+                fontWeight = FontWeight.Normal,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(top = 3.dp, end = 5.dp)
             )
         }
+
+        key.hintIcon?.let { icon ->
+            Icon(
+                imageVector = icon.imageVector(),
+                contentDescription = null,
+                tint = palette.textSecondary,
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = EmojiHintIconTopPadding)
+                    .size(EmojiHintIconSize)
+            )
+        }
+    }
+}
+
+private fun KeyInfo.labelFontSize(label: String): TextUnit {
+    return when {
+        hintIcon != null -> EmojiCommaLabelFontSize
+        code == KeyboardKeyCodes.SPACE -> SpacebarLabelFontSize
+        label.length > LongKeyLabelCharacterCount -> LongKeyLabelFontSize
+        else -> KeyLabelFontSize
     }
 }
 
@@ -777,8 +819,9 @@ private fun AlternativesPopup(
                         Text(
                             text = alternative,
                             color = palette.text,
-                            fontSize = 23.sp,
-                            fontWeight = FontWeight.Medium
+                            fontSize = KeyLabelFontSize,
+                            fontFamily = FontFamily.SansSerif,
+                            fontWeight = FontWeight.Normal
                         )
                     }
                 }
@@ -862,8 +905,8 @@ private fun StickersPanel(
                 horizontal = KeyboardHorizontalPadding,
                 vertical = KeyboardVerticalPadding
             ),
-        horizontalArrangement = Arrangement.spacedBy(KeyGap),
-        verticalArrangement = Arrangement.spacedBy(KeyGap)
+        horizontalArrangement = Arrangement.spacedBy(PanelItemGap),
+        verticalArrangement = Arrangement.spacedBy(PanelItemGap)
     ) {
         if (!supportsStickerContent) {
             item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
@@ -981,7 +1024,7 @@ private fun PanelNavigation(
                 end = KeyboardHorizontalPadding,
                 bottom = KeyboardVerticalPadding
             ),
-        horizontalArrangement = Arrangement.spacedBy(KeyGap)
+        horizontalArrangement = Arrangement.spacedBy(KeyHorizontalGap)
     ) {
         Box(
             modifier = Modifier
@@ -1030,12 +1073,18 @@ private fun KeyIcon.imageVector(): ImageVector {
     return when (this) {
         KeyIcon.BACKSPACE -> Icons.AutoMirrored.Rounded.Backspace
         KeyIcon.DONE -> Icons.Rounded.Done
-        KeyIcon.EMOJI -> Icons.Rounded.EmojiEmotions
+        KeyIcon.EMOJI -> Icons.Outlined.EmojiEmotions
         KeyIcon.ENTER -> Icons.AutoMirrored.Rounded.KeyboardReturn
         KeyIcon.LANGUAGE -> Icons.Rounded.Language
         KeyIcon.SEARCH -> Icons.Rounded.Search
         KeyIcon.SEND -> Icons.AutoMirrored.Rounded.Send
         KeyIcon.SHIFT -> Icons.Rounded.ArrowUpward
+    }
+}
+
+private fun KeyLongPressAction.contentDescription(): String {
+    return when (this) {
+        KeyLongPressAction.SHOW_EMOJI -> "Открыть эмодзи"
     }
 }
 
@@ -1097,10 +1146,13 @@ private const val DimensionResourceType = "dimen"
 private const val InputMethodNavigationBarHeightResourceName =
     "input_method_navigation_bar_height"
 private const val NavigationBarFrameHeightResourceName = "navigation_bar_frame_height"
+private const val LongKeyLabelCharacterCount = 3
 
 private val ToolbarHeight = 50.dp
-private val KeyHeight = 49.dp
-private val KeyGap = 5.dp
+private val KeyHeight = 47.dp
+private val KeyHorizontalGap = 5.dp
+private val KeyVerticalGap = 12.dp
+private val PanelItemGap = 5.dp
 private val KeyCornerRadius = 10.dp
 private val KeyboardHorizontalPadding = 6.dp
 private val KeyboardVerticalPadding = 6.dp
@@ -1110,7 +1162,7 @@ private val EmojiPanelBodyHeight = 270.dp
 private val StickerPanelBodyHeight = 270.dp
 private val StickerItemHeight = 122.dp
 private val PanelNavigationHeight = 49.dp
-private val NumberGridHeight = KeyHeight * 3 + KeyGap * 2
+private val NumberGridHeight = KeyHeight * 3 + KeyVerticalGap * 2
 private const val NumberSideColumnWeight = 0.85f
 private const val NumberDigitGridWeight = 4.25f
 private val AlternativeItemWidth = 48.dp
@@ -1118,3 +1170,10 @@ private val PopupHeight = 58.dp
 private val PopupHorizontalPadding = 4.dp
 private val PopupCornerRadius = 16.dp
 private val PopupWindowMargin = 6.dp
+private val KeyLabelFontSize = 28.sp
+private val LongKeyLabelFontSize = 18.sp
+private val SpacebarLabelFontSize = 14.sp
+private val EmojiCommaLabelFontSize = 18.sp
+private val EmojiHintIconSize = 14.dp
+private val EmojiHintIconTopPadding = 4.dp
+private val EmojiCommaLabelBottomPadding = 3.dp

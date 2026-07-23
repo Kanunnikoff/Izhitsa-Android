@@ -29,6 +29,7 @@ import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import software.kanunnikoff.izhitsa.compose.KeyIcon
 import software.kanunnikoff.izhitsa.compose.KeyInfo
+import software.kanunnikoff.izhitsa.compose.KeyLongPressAction
 import software.kanunnikoff.izhitsa.compose.KeyboardKeyCodes
 import software.kanunnikoff.izhitsa.compose.KeyboardLayouts
 import software.kanunnikoff.izhitsa.compose.KeyboardPanel
@@ -149,6 +150,7 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
                     clipboardText = currentClipboardText.value,
                     supportsStickerContent = supportsStickerContent,
                     onKeyClick = ::onKey,
+                    onKeyLongPressAction = ::handleKeyLongPressAction,
                     onAlternativeSelected = ::onAlternativeSelected,
                     onSuggestionClick = ::commitSuggestion,
                     onToolbarAction = ::handleToolbarAction,
@@ -323,11 +325,16 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
             key.code == KeyboardKeyCodes.SYMBOLS -> showSymbolsLayout()
             key.code == KeyboardKeyCodes.MORE_SYMBOLS -> showMoreSymbolsLayout()
             key.code == KeyboardKeyCodes.LANGUAGE -> switchLanguage()
-            key.code == KeyboardKeyCodes.EMOJI -> currentPanel.value = KeyboardPanel.EMOJI
             else -> handleCharacter(key = key)
         }
 
         refreshTextState()
+    }
+
+    private fun handleKeyLongPressAction(action: KeyLongPressAction) {
+        when (action) {
+            KeyLongPressAction.SHOW_EMOJI -> currentPanel.value = KeyboardPanel.EMOJI
+        }
     }
 
     private fun onAlternativeSelected(
@@ -827,10 +834,6 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
 
             KeyboardToolbarAction.STICKERS -> {
                 currentPanel.value = KeyboardPanel.STICKERS
-            }
-
-            KeyboardToolbarAction.EMOJI -> {
-                currentPanel.value = KeyboardPanel.EMOJI
             }
 
             KeyboardToolbarAction.CLIPBOARD -> {

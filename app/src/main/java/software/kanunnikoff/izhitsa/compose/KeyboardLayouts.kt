@@ -7,7 +7,6 @@ object KeyboardKeyCodes {
     const val DELETE = -5
     const val SYMBOLS = -6
     const val LANGUAGE = -101
-    const val EMOJI = -102
     const val ENTER = 10
     const val SPACE = 32
 }
@@ -40,8 +39,7 @@ object KeyboardLayouts {
         ),
         listOf(
             special(KeyboardKeyCodes.MODE_ALPHA, "АБВ", weight = 1.5f),
-            key(","),
-            special(KeyboardKeyCodes.EMOJI, icon = KeyIcon.EMOJI, weight = 1.1f),
+            emojiCommaKey(),
             KeyInfo(
                 code = KeyboardKeyCodes.SPACE,
                 label = "Русский",
@@ -69,7 +67,6 @@ object KeyboardLayouts {
         listOf(
             special(KeyboardKeyCodes.MODE_ALPHA, "АБВ", weight = 1.5f),
             key("<"),
-            special(KeyboardKeyCodes.EMOJI, icon = KeyIcon.EMOJI, weight = 1.1f),
             KeyInfo(
                 code = KeyboardKeyCodes.SPACE,
                 label = "Русский",
@@ -216,8 +213,7 @@ object KeyboardLayouts {
     private fun alphabetBottomRow(language: String): List<KeyInfo> {
         return listOf(
             special(KeyboardKeyCodes.SYMBOLS, "?123", weight = 1.5f),
-            key(",", weight = 0.9f),
-            special(KeyboardKeyCodes.EMOJI, icon = KeyIcon.EMOJI, weight = 0.9f),
+            emojiCommaKey(weight = 0.9f),
             special(KeyboardKeyCodes.LANGUAGE, icon = KeyIcon.LANGUAGE, weight = 0.9f),
             KeyInfo(
                 code = KeyboardKeyCodes.SPACE,
@@ -226,6 +222,21 @@ object KeyboardLayouts {
             ),
             key(".", weight = 0.9f),
             enterKey()
+        )
+    }
+
+    private fun emojiCommaKey(weight: Float = 1f): KeyInfo {
+        /*
+         * Клавиша сохраняет код обычной запятой, поэтому короткое нажатие продолжает
+         * вводить знак препинания. Отдельное действие долгого удержания открывает
+         * панель эмодзи, а значок лишь подсказывает об этой возможности.
+         */
+        return KeyInfo(
+            code = ",".first().code,
+            label = ",",
+            hintIcon = KeyIcon.EMOJI,
+            longPressAction = KeyLongPressAction.SHOW_EMOJI,
+            weight = weight
         )
     }
 
