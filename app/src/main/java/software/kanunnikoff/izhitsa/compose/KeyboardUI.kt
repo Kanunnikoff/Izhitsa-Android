@@ -38,12 +38,12 @@ import androidx.compose.material.icons.automirrored.rounded.Backspace
 import androidx.compose.material.icons.automirrored.rounded.KeyboardReturn
 import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.outlined.EmojiEmotions
-import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.ContentPaste
 import androidx.compose.material.icons.rounded.Collections
 import androidx.compose.material.icons.rounded.Dialpad
 import androidx.compose.material.icons.rounded.Done
 import androidx.compose.material.icons.rounded.Face
+import androidx.compose.material.icons.rounded.GridView
 import androidx.compose.material.icons.rounded.KeyboardCapslock
 import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Search
@@ -113,10 +113,15 @@ data class KeyInfo(
     val hint: String? = null,
     val hintIcon: KeyIcon? = null,
     val alternatives: List<String> = emptyList(),
+    val tapAlternatives: List<String> = alternatives,
+    val alternativeRowLengths: List<Int> = emptyList(),
+    val preferredAlternativeIndex: Int? = null,
     val longPressAction: KeyLongPressAction? = null,
     val weight: Float = 1f,
+    val fontSize: TextUnit? = null,
     val isModifier: Boolean = false,
-    val isActive: Boolean = false
+    val isActive: Boolean = false,
+    val repeatOnLongPress: Boolean = false
 )
 
 enum class KeyLongPressAction {
@@ -145,7 +150,7 @@ fun KeyboardScreen(
     suggestions: List<String>,
     clipboardText: String?,
     supportsStickerContent: Boolean,
-    onKeyClick: (KeyInfo) -> Unit,
+    onKeyClick: (KeyInfo) -> Boolean,
     onKeyLongPressAction: (KeyLongPressAction) -> Unit,
     onAlternativeSelected: (KeyInfo, String) -> Unit,
     onSuggestionClick: (String) -> Unit,
@@ -378,7 +383,7 @@ private fun KeyboardToolbar(
             }
         } else {
             ToolbarIcon(
-                imageVector = Icons.Rounded.Apps,
+                imageVector = Icons.Rounded.GridView,
                 contentDescription = "Сменить клавиатуру",
                 palette = palette,
                 onClick = { onToolbarAction(KeyboardToolbarAction.SWITCH_INPUT_METHOD) }
@@ -462,7 +467,7 @@ private fun PanelToolbar(
 private fun KeyboardRows(
     rows: List<List<KeyInfo>>,
     palette: KeyboardPalette,
-    onKeyClick: (KeyInfo) -> Unit,
+    onKeyClick: (KeyInfo) -> Boolean,
     onKeyLongPressAction: (KeyLongPressAction) -> Unit,
     onAlternativeSelected: (KeyInfo, String) -> Unit,
     onAlternativeMenuVisibilityChanged: (Boolean) -> Unit
@@ -508,7 +513,7 @@ private fun KeyboardRows(
 private fun NumberKeyboardRows(
     rows: List<List<KeyInfo>>,
     palette: KeyboardPalette,
-    onKeyClick: (KeyInfo) -> Unit,
+    onKeyClick: (KeyInfo) -> Boolean,
     onKeyLongPressAction: (KeyLongPressAction) -> Unit,
     onAlternativeSelected: (KeyInfo, String) -> Unit,
     onAlternativeMenuVisibilityChanged: (Boolean) -> Unit
@@ -627,7 +632,7 @@ private fun NumberOperatorColumn(
     keys: List<KeyInfo>,
     modifier: Modifier,
     palette: KeyboardPalette,
-    onKeyClick: (KeyInfo) -> Unit
+    onKeyClick: (KeyInfo) -> Boolean
 ) {
     Column(
         modifier = modifier
@@ -649,7 +654,7 @@ private fun NumberOperatorColumn(
                 Text(
                     text = key.label.orEmpty(),
                     color = palette.text,
-                    fontSize = KeyLabelFontSize,
+                    fontSize = key.fontSize ?: KeyLabelFontSize,
                     fontFamily = FontFamily.SansSerif,
                     fontWeight = FontWeight.Normal
                 )
@@ -665,7 +670,7 @@ private fun KeyButton(
     modifier: Modifier = Modifier,
     palette: KeyboardPalette,
     isBottomRow: Boolean,
-    onClick: () -> Unit,
+    onClick: () -> Boolean,
     onLongPressAction: (KeyLongPressAction) -> Unit,
     onAlternativeMenuVisibilityChanged: (Boolean) -> Unit,
     onAlternativeSelected: (String) -> Unit
@@ -677,7 +682,7 @@ private fun KeyButton(
     var isPressed by remember(key) { mutableStateOf(false) }
     var alternativesVisible by remember(key) { mutableStateOf(false) }
     var selectedAlternativeIndex by remember(key) {
-        mutableStateOf(key.defaultAlternativeIndex())
+        mutableStateOf(key.defaultMenuItemIndex())
     }
     var keyBounds by remember { mutableStateOf(Rect.Zero) }
 
@@ -712,18 +717,23 @@ private fun KeyButton(
                     true
                 }
 
-                if (key.alternatives.isNotEmpty() || key.longPressAction != null) {
+                if (key.menuItemCount() > 0 || key.repeatOnLongPress) {
                     onLongClick(label = key.longPressDescription()) {
                         when {
                             key.alternatives.isNotEmpty() -> {
                                 onAlternativeSelected(
-                                    key.alternatives[key.defaultAlternativeIndex()]
+                                    key.alternatives[
+                                        key.defaultMenuItemIndex()
+                                            .coerceAtMost(key.alternatives.lastIndex)
+                                    ]
                                 )
                             }
 
                             key.longPressAction != null -> {
                                 onLongPressAction(key.longPressAction)
                             }
+
+                            key.repeatOnLongPress -> onClick()
                         }
 
                         true
@@ -734,11 +744,15 @@ private fun KeyButton(
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     var releasedBeforeLongPress = false
-                    var latestPosition = down.position
+                    val holdDelayMillis = if (key.repeatOnLongPress) {
+                        RepeatDeleteStartDelayMillis
+                    } else {
+                        longPressTimeoutMillis
+                    }
 
                     isPressed = true
 
-                    withTimeoutOrNull(timeMillis = longPressTimeoutMillis) {
+                    withTimeoutOrNull(timeMillis = holdDelayMillis) {
                         while (!releasedBeforeLongPress) {
                             val change = awaitPointerEvent()
                                 .changes
@@ -748,8 +762,6 @@ private fun KeyButton(
 
                             if (change == null || !change.pressed) {
                                 releasedBeforeLongPress = true
-                            } else {
-                                latestPosition = change.position
                             }
                         }
                     }
@@ -760,10 +772,36 @@ private fun KeyButton(
                         return@awaitEachGesture
                     }
 
-                    val supportsAlternativeMenu = key.alternatives.isNotEmpty()
-                    val longPressAction = key.longPressAction
+                    if (key.repeatOnLongPress) {
+                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
 
-                    if (!supportsAlternativeMenu && longPressAction == null) {
+                        var canContinueDeleting = onClick()
+                        var released = false
+
+                        while (!released) {
+                            val event = withTimeoutOrNull(
+                                timeMillis = RepeatDeleteIntervalMillis
+                            ) {
+                                awaitPointerEvent()
+                            }
+
+                            if (event == null) {
+                                if (canContinueDeleting) {
+                                    canContinueDeleting = onClick()
+                                }
+                            } else {
+                                val change = event.changes.firstOrNull { pointerChange ->
+                                    pointerChange.id == down.id
+                                }
+                                released = change == null || !change.pressed
+                            }
+                        }
+
+                        isPressed = false
+                        return@awaitEachGesture
+                    }
+
+                    if (key.menuItemCount() == 0) {
                         var released = false
 
                         while (!released) {
@@ -782,54 +820,50 @@ private fun KeyButton(
 
                     hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
 
-                    if (longPressAction != null && !supportsAlternativeMenu) {
-                        isPressed = false
-                        onLongPressAction(longPressAction)
-                        return@awaitEachGesture
-                    }
-
-                    selectedAlternativeIndex = key.defaultAlternativeIndex()
+                    selectedAlternativeIndex = key.defaultMenuItemIndex()
                     alternativesVisible = true
                     onAlternativeMenuVisibilityChanged(true)
 
-                    selectedAlternativeIndex = alternativeIndexAt(
-                        key = key,
-                        keyBounds = keyBounds,
-                        pointerX = keyBounds.left + latestPosition.x,
-                        density = density,
-                        screenWidthPixels = screenWidthPixels
-                    )
-
                     var released = false
 
-                    while (!released) {
-                        val change = awaitPointerEvent()
-                            .changes
-                            .firstOrNull { pointerChange ->
-                                pointerChange.id == down.id
-                            }
+                    try {
+                        while (!released) {
+                            val change = awaitPointerEvent()
+                                .changes
+                                .firstOrNull { pointerChange ->
+                                    pointerChange.id == down.id
+                                }
 
-                        if (change == null || !change.pressed) {
-                            released = true
-                        } else {
-                            selectedAlternativeIndex = alternativeIndexAt(
-                                key = key,
-                                keyBounds = keyBounds,
-                                pointerX = keyBounds.left + change.position.x,
-                                density = density,
-                                screenWidthPixels = screenWidthPixels
-                            )
+                            if (change == null || !change.pressed) {
+                                released = true
+                            } else {
+                                selectedAlternativeIndex = alternativeIndexAt(
+                                    key = key,
+                                    keyBounds = keyBounds,
+                                    pointerX = keyBounds.left + change.position.x,
+                                    pointerY = keyBounds.top + change.position.y,
+                                    density = density,
+                                    screenWidthPixels = screenWidthPixels
+                                )
+                            }
                         }
+                    } finally {
+                        alternativesVisible = false
+                        onAlternativeMenuVisibilityChanged(false)
+                        isPressed = false
                     }
 
-                    val selectedAlternative = key.alternatives
-                        .getOrNull(selectedAlternativeIndex)
+                    when {
+                        selectedAlternativeIndex < key.alternatives.size -> {
+                            key.alternatives
+                                .getOrNull(selectedAlternativeIndex)
+                                ?.let(onAlternativeSelected)
+                        }
 
-                    alternativesVisible = false
-                    onAlternativeMenuVisibilityChanged(false)
-                    isPressed = false
-
-                    selectedAlternative?.let(onAlternativeSelected)
+                        selectedAlternativeIndex == key.alternatives.size -> {
+                            key.longPressAction?.let(onLongPressAction)
+                        }
+                    }
                 }
             },
         contentAlignment = Alignment.Center
@@ -843,6 +877,7 @@ private fun KeyButton(
     if (alternativesVisible) {
         AlternativesPopup(
             key = key,
+            keyBounds = keyBounds,
             palette = palette,
             selectedIndex = selectedAlternativeIndex
         )
@@ -862,26 +897,33 @@ private fun KeyContent(
 
     Box(modifier = Modifier.fillMaxSize()) {
         key.icon?.let { icon ->
-            val drawableResource = icon.drawableResource()
-
-            if (drawableResource != null) {
-                Icon(
-                    painter = painterResource(id = drawableResource),
-                    contentDescription = icon.contentDescription(),
-                    tint = contentColor,
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .size(icon.size())
+            if (icon == KeyIcon.NUMBER_PAD) {
+                NumberPadIcon(
+                    color = contentColor,
+                    modifier = Modifier.align(Alignment.Center)
                 )
             } else {
-                Icon(
-                    imageVector = icon.imageVector(),
-                    contentDescription = icon.contentDescription(),
-                    tint = contentColor,
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .size(icon.size())
-                )
+                val drawableResource = icon.drawableResource()
+
+                if (drawableResource != null) {
+                    Icon(
+                        painter = painterResource(id = drawableResource),
+                        contentDescription = icon.contentDescription(),
+                        tint = contentColor,
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .size(icon.size())
+                    )
+                } else {
+                    Icon(
+                        imageVector = icon.imageVector(),
+                        contentDescription = icon.contentDescription(),
+                        tint = contentColor,
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .size(icon.size())
+                    )
+                }
             }
         }
 
@@ -889,7 +931,7 @@ private fun KeyContent(
             Text(
                 text = label,
                 color = contentColor,
-                fontSize = key.labelFontSize(label = label),
+                fontSize = key.fontSize ?: key.labelFontSize(label = label),
                 fontFamily = FontFamily.SansSerif,
                 fontWeight = FontWeight.Normal,
                 modifier = if (key.hintIcon == null) {
@@ -929,6 +971,41 @@ private fun KeyContent(
     }
 }
 
+@Composable
+private fun NumberPadIcon(
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    /*
+     * Gboard обозначает цифровую раскладку двумя строками «12» и «34».
+     * Отдельный составной знак сохраняет это начертание при любом масштабе
+     * шрифта и не зависит от наличия похожей пиктограммы в наборе Material.
+     */
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = "12",
+            color = color,
+            fontSize = NumberPadIconFontSize,
+            lineHeight = NumberPadIconLineHeight,
+            fontFamily = FontFamily.SansSerif,
+            fontWeight = FontWeight.Medium
+        )
+
+        Text(
+            text = "34",
+            color = color,
+            fontSize = NumberPadIconFontSize,
+            lineHeight = NumberPadIconLineHeight,
+            fontFamily = FontFamily.SansSerif,
+            fontWeight = FontWeight.Medium
+        )
+    }
+}
+
 private fun KeyInfo.labelFontSize(label: String): TextUnit {
     return when {
         hintIcon != null -> EmojiCommaLabelFontSize
@@ -938,12 +1015,38 @@ private fun KeyInfo.labelFontSize(label: String): TextUnit {
     }
 }
 
-private fun KeyInfo.defaultAlternativeIndex(): Int {
-    val firstAlternativeIndex = alternatives.indexOfFirst { alternative ->
-        alternative != label
+private fun KeyInfo.menuItemCount(): Int {
+    return alternatives.size + if (longPressAction == null) 0 else 1
+}
+
+private fun KeyInfo.menuRowLengths(): List<Int> {
+    val itemCount = menuItemCount()
+    val hasValidRows = alternativeRowLengths.isNotEmpty() &&
+        alternativeRowLengths.all { rowLength -> rowLength > 0 } &&
+        alternativeRowLengths.sum() == itemCount
+
+    return if (hasValidRows) {
+        alternativeRowLengths
+    } else {
+        listOf(itemCount)
+    }
+}
+
+private fun KeyInfo.defaultMenuItemIndex(): Int {
+    val itemCount = menuItemCount()
+
+    if (itemCount == 0) {
+        return 0
     }
 
-    return firstAlternativeIndex.coerceAtLeast(0)
+    val inferredIndex = alternatives.indexOfFirst { alternative ->
+        alternative != label
+    }.coerceAtLeast(0)
+
+    return (preferredAlternativeIndex ?: inferredIndex).coerceIn(
+        minimumValue = 0,
+        maximumValue = itemCount - 1
+    )
 }
 
 private fun KeyInfo.shape(isBottomRow: Boolean): RoundedCornerShape {
@@ -970,6 +1073,7 @@ private fun KeyInfo.longPressDescription(): String {
     return when {
         alternatives.isNotEmpty() -> "Показать альтернативные символы"
         longPressAction != null -> longPressAction.contentDescription()
+        repeatOnLongPress -> "Удалять непрерывно"
         else -> "Удержать клавишу"
     }
 }
@@ -978,50 +1082,82 @@ private fun alternativeIndexAt(
     key: KeyInfo,
     keyBounds: Rect,
     pointerX: Float,
+    pointerY: Float,
     density: Density,
     screenWidthPixels: Int
 ): Int {
-    val popupWidthPixels = with(density) {
+    val geometry = alternativePopupGeometry(
+        key = key,
+        keyBounds = keyBounds,
+        density = density,
+        screenWidthPixels = screenWidthPixels
+    )
+    val defaultLocation = menuLocation(
+        index = key.defaultMenuItemIndex(),
+        rowLengths = geometry.rowLengths
+    )
+    val popupBottom = geometry.popupTopPixels + geometry.popupHeightPixels
+    val pointerInsidePopupVertically = pointerY >= geometry.popupTopPixels &&
+        pointerY < popupBottom
+    val row = if (pointerInsidePopupVertically) {
         (
-            AlternativeItemWidth * key.alternatives.size +
-                PopupHorizontalPadding * 2
-            ).roundToPx()
-    }
-    val popupMarginPixels = with(density) { PopupWindowMargin.roundToPx() }
-    val popupHorizontalPaddingPixels = with(density) {
-        PopupHorizontalPadding.roundToPx()
-    }
-    val itemWidthPixels = with(density) { AlternativeItemWidth.toPx() }
-    val popupX = (keyBounds.center.x - popupWidthPixels / 2f)
-        .roundToInt()
-        .coerceIn(
-            minimumValue = popupMarginPixels,
-            maximumValue = (screenWidthPixels - popupWidthPixels - popupMarginPixels)
-                .coerceAtLeast(popupMarginPixels)
+            (pointerY - geometry.popupTopPixels - geometry.verticalPaddingPixels) /
+                geometry.rowHeightPixels
+            ).toInt().coerceIn(
+            minimumValue = 0,
+            maximumValue = geometry.rowLengths.lastIndex
         )
-    val contentX = pointerX - popupX - popupHorizontalPaddingPixels
-
-    return (contentX / itemWidthPixels)
+    } else {
+        defaultLocation.row
+    }
+    val rowLength = geometry.rowLengths[row]
+    val rowHorizontalInset = (
+        geometry.maxColumnCount - rowLength
+        ) * geometry.itemWidthPixels / 2f
+    val contentX = pointerX -
+        geometry.popupLeftPixels -
+        geometry.horizontalPaddingPixels -
+        rowHorizontalInset
+    val column = (contentX / geometry.itemWidthPixels)
         .toInt()
         .coerceIn(
             minimumValue = 0,
-            maximumValue = key.alternatives.lastIndex
+            maximumValue = rowLength - 1
         )
+    val rowStartIndex = geometry.rowLengths
+        .take(row)
+        .sum()
+
+    return rowStartIndex + column
 }
 
 @Composable
 private fun AlternativesPopup(
     key: KeyInfo,
+    keyBounds: Rect,
     palette: KeyboardPalette,
     selectedIndex: Int
 ) {
     val density = LocalDensity.current
     val popupMarginPixels = with(density) { PopupWindowMargin.roundToPx() }
-    val positionProvider = remember(popupMarginPixels) {
+    val preferredItemCenterPixels = key.preferredItemCenterPixels(density = density)
+    val anchorCenterPixels = keyBounds.center.x.roundToInt()
+    val anchorTopPixels = keyBounds.top.roundToInt()
+    val positionProvider = remember(
+        popupMarginPixels,
+        preferredItemCenterPixels,
+        anchorCenterPixels,
+        anchorTopPixels
+    ) {
         AlternativePopupPositionProvider(
-            marginPixels = popupMarginPixels
+            marginPixels = popupMarginPixels,
+            preferredItemCenterPixels = preferredItemCenterPixels,
+            anchorCenterPixels = anchorCenterPixels,
+            anchorTopPixels = anchorTopPixels
         )
     }
+    val rowLengths = key.menuRowLengths()
+    val maximumColumnCount = rowLengths.max()
 
     Popup(
         popupPositionProvider = positionProvider,
@@ -1033,57 +1169,224 @@ private fun AlternativesPopup(
         )
     ) {
         Surface(
+            modifier = Modifier
+                .width(
+                    AlternativeItemWidth * maximumColumnCount +
+                        PopupHorizontalPadding * 2
+                )
+                .height(
+                    AlternativeRowHeight * rowLengths.size +
+                        PopupVerticalPadding * 2
+                ),
             color = palette.popup,
             shape = RoundedCornerShape(size = PopupCornerRadius),
             shadowElevation = 8.dp
         ) {
-            Row(
+            Column(
                 modifier = Modifier
-                    .height(PopupHeight)
-                    .padding(horizontal = PopupHorizontalPadding),
-                verticalAlignment = Alignment.CenterVertically
+                    .fillMaxSize()
+                    .padding(
+                        horizontal = PopupHorizontalPadding,
+                        vertical = PopupVerticalPadding
+                    ),
+                verticalArrangement = Arrangement.Center
             ) {
-                key.alternatives.forEachIndexed { index, alternative ->
-                    Box(
+                var firstIndexInRow = 0
+
+                rowLengths.forEach { rowLength ->
+                    Row(
                         modifier = Modifier
-                            .width(AlternativeItemWidth)
-                            .fillMaxHeight(),
-                        contentAlignment = Alignment.Center
+                            .fillMaxWidth()
+                            .height(AlternativeRowHeight),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(AlternativeSelectedItemSize)
-                                .clip(shape = CircleShape)
-                                .background(
-                                    color = if (index == selectedIndex) {
-                                        palette.popupSelected
-                                    } else {
-                                        Color.Transparent
-                                    }
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = alternative,
-                                color = if (index == selectedIndex) {
-                                    palette.popupSelectedText
-                                } else {
-                                    palette.text
-                                },
-                                fontSize = KeyLabelFontSize,
-                                fontFamily = FontFamily.SansSerif,
-                                fontWeight = FontWeight.Normal
+                        repeat(times = rowLength) { column ->
+                            val index = firstIndexInRow + column
+
+                            AlternativeMenuItem(
+                                key = key,
+                                index = index,
+                                isSelected = index == selectedIndex,
+                                palette = palette
                             )
                         }
                     }
+
+                    firstIndexInRow += rowLength
                 }
             }
         }
     }
 }
 
+@Composable
+private fun AlternativeMenuItem(
+    key: KeyInfo,
+    index: Int,
+    isSelected: Boolean,
+    palette: KeyboardPalette
+) {
+    Box(
+        modifier = Modifier
+            .width(AlternativeItemWidth)
+            .fillMaxHeight(),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .size(AlternativeSelectedItemSize)
+                .clip(shape = CircleShape)
+                .background(
+                    color = if (isSelected) {
+                        palette.popupSelected
+                    } else {
+                        Color.Transparent
+                    }
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            val contentColor = if (isSelected) {
+                palette.popupSelectedText
+            } else {
+                palette.text
+            }
+
+            if (index < key.alternatives.size) {
+                Text(
+                    text = key.alternatives[index],
+                    color = contentColor,
+                    fontSize = AlternativeLabelFontSize,
+                    fontFamily = FontFamily.SansSerif,
+                    fontWeight = FontWeight.Normal
+                )
+            } else {
+                key.longPressAction?.let { action ->
+                    Icon(
+                        imageVector = action.icon().imageVector(),
+                        contentDescription = action.contentDescription(),
+                        tint = contentColor,
+                        modifier = Modifier.size(AlternativeActionIconSize)
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun alternativePopupGeometry(
+    key: KeyInfo,
+    keyBounds: Rect,
+    density: Density,
+    screenWidthPixels: Int
+): AlternativePopupGeometry {
+    val rowLengths = key.menuRowLengths()
+    val maximumColumnCount = rowLengths.max()
+    val itemWidthPixels = with(density) { AlternativeItemWidth.toPx() }
+    val rowHeightPixels = with(density) { AlternativeRowHeight.toPx() }
+    val horizontalPaddingPixels = with(density) { PopupHorizontalPadding.toPx() }
+    val verticalPaddingPixels = with(density) { PopupVerticalPadding.toPx() }
+    val popupMarginPixels = with(density) { PopupWindowMargin.roundToPx() }
+    val popupWidthPixels = (
+        itemWidthPixels * maximumColumnCount +
+            horizontalPaddingPixels * 2
+        ).roundToInt()
+    val popupHeightPixels = (
+        rowHeightPixels * rowLengths.size +
+            verticalPaddingPixels * 2
+        ).roundToInt()
+    val preferredItemCenterPixels = key.preferredItemCenterPixels(density = density)
+    val popupLeftPixels = (
+        keyBounds.center.x - preferredItemCenterPixels
+        ).roundToInt().coerceIn(
+        minimumValue = popupMarginPixels,
+        maximumValue = (
+            screenWidthPixels - popupWidthPixels - popupMarginPixels
+            ).coerceAtLeast(popupMarginPixels)
+    )
+
+    return AlternativePopupGeometry(
+        rowLengths = rowLengths,
+        maxColumnCount = maximumColumnCount,
+        itemWidthPixels = itemWidthPixels,
+        rowHeightPixels = rowHeightPixels,
+        horizontalPaddingPixels = horizontalPaddingPixels,
+        verticalPaddingPixels = verticalPaddingPixels,
+        popupLeftPixels = popupLeftPixels,
+        popupTopPixels = keyBounds.top -
+            popupHeightPixels -
+            popupMarginPixels,
+        popupHeightPixels = popupHeightPixels
+    )
+}
+
+private fun KeyInfo.preferredItemCenterPixels(density: Density): Int {
+    val rowLengths = menuRowLengths()
+    val maximumColumnCount = rowLengths.max()
+    val location = menuLocation(
+        index = defaultMenuItemIndex(),
+        rowLengths = rowLengths
+    )
+    val itemWidthPixels = with(density) { AlternativeItemWidth.toPx() }
+    val horizontalPaddingPixels = with(density) { PopupHorizontalPadding.toPx() }
+    val rowHorizontalInset = (
+        maximumColumnCount - rowLengths[location.row]
+        ) * itemWidthPixels / 2f
+
+    return (
+        horizontalPaddingPixels +
+            rowHorizontalInset +
+            (location.column + 0.5f) * itemWidthPixels
+        ).roundToInt()
+}
+
+private fun menuLocation(
+    index: Int,
+    rowLengths: List<Int>
+): AlternativeMenuLocation {
+    var rowStartIndex = 0
+
+    rowLengths.forEachIndexed { row, rowLength ->
+        val rowEndIndex = rowStartIndex + rowLength
+
+        if (index < rowEndIndex) {
+            return AlternativeMenuLocation(
+                row = row,
+                column = index - rowStartIndex
+            )
+        }
+
+        rowStartIndex = rowEndIndex
+    }
+
+    return AlternativeMenuLocation(
+        row = rowLengths.lastIndex,
+        column = rowLengths.last() - 1
+    )
+}
+
+private data class AlternativeMenuLocation(
+    val row: Int,
+    val column: Int
+)
+
+private data class AlternativePopupGeometry(
+    val rowLengths: List<Int>,
+    val maxColumnCount: Int,
+    val itemWidthPixels: Float,
+    val rowHeightPixels: Float,
+    val horizontalPaddingPixels: Float,
+    val verticalPaddingPixels: Float,
+    val popupLeftPixels: Int,
+    val popupTopPixels: Float,
+    val popupHeightPixels: Int
+)
+
 private class AlternativePopupPositionProvider(
-    private val marginPixels: Int
+    private val marginPixels: Int,
+    private val preferredItemCenterPixels: Int,
+    private val anchorCenterPixels: Int,
+    private val anchorTopPixels: Int
 ) : PopupPositionProvider {
     override fun calculatePosition(
         anchorBounds: IntRect,
@@ -1092,18 +1395,18 @@ private class AlternativePopupPositionProvider(
         popupContentSize: IntSize
     ): IntOffset {
         /*
-         * Положение считается относительно настоящих границ клавиши, которые
-         * Compose передаёт поставщику позиции. Поэтому плашка может выступать над
-         * верхом окна клавиатуры, как в Gboard, и не получает двойное смещение.
+         * Плашка совмещает с удерживаемой клавишей выбранный по умолчанию
+         * символ, как Gboard. Ограничение по краям экрана не позволяет панели
+         * выйти за доступную ширину даже для двух рядов пунктуации.
          */
-        val x = (anchorBounds.center.x - popupContentSize.width / 2)
+        val x = (anchorCenterPixels - preferredItemCenterPixels)
             .coerceIn(
                 minimumValue = marginPixels,
                 maximumValue = (
                     windowSize.width - popupContentSize.width - marginPixels
                     ).coerceAtLeast(marginPixels)
             )
-        val y = anchorBounds.top - popupContentSize.height - marginPixels
+        val y = anchorTopPixels - popupContentSize.height - marginPixels
 
         return IntOffset(x = x, y = y)
     }
@@ -1386,6 +1689,12 @@ private fun KeyLongPressAction.contentDescription(): String {
     }
 }
 
+private fun KeyLongPressAction.icon(): KeyIcon {
+    return when (this) {
+        KeyLongPressAction.SHOW_EMOJI -> KeyIcon.EMOJI
+    }
+}
+
 private fun KeyIcon.contentDescription(): String {
     return when (this) {
         KeyIcon.BACKSPACE -> "Удалить"
@@ -1450,6 +1759,8 @@ private const val StickerColumnCount = 2
 private const val PressAnimationDurationMillis = 70
 private const val PressedKeyScale = 0.96f
 private const val AlternativeMenuBackgroundAlpha = 0.4f
+private const val RepeatDeleteStartDelayMillis = 1_000L
+private const val RepeatDeleteIntervalMillis = 70L
 private const val AndroidResourcePackage = "android"
 private const val DimensionResourceType = "dimen"
 private const val InputMethodNavigationBarHeightResourceName =
@@ -1479,16 +1790,21 @@ private val PanelNavigationHeight = 49.dp
 private val NumberGridHeight = KeyHeight * 3 + KeyVerticalGap * 2
 private const val NumberSideColumnWeight = 0.85f
 private const val NumberDigitGridWeight = 4.25f
-private val AlternativeItemWidth = 52.dp
+private val AlternativeItemWidth = 40.dp
+private val AlternativeRowHeight = 46.dp
 private val AlternativeSelectedItemSize = 44.dp
-private val PopupHeight = 70.dp
-private val PopupHorizontalPadding = 4.dp
+private val PopupHorizontalPadding = 12.dp
+private val PopupVerticalPadding = 4.dp
 private val PopupCornerRadius = 35.dp
 private val PopupWindowMargin = 6.dp
 private val KeyLabelFontSize = 28.sp
+private val AlternativeLabelFontSize = 26.sp
 private val LongKeyLabelFontSize = 18.sp
 private val SpacebarLabelFontSize = 14.sp
 private val EmojiCommaLabelFontSize = 18.sp
+private val NumberPadIconFontSize = 13.sp
+private val NumberPadIconLineHeight = 12.sp
 private val EmojiHintIconSize = 14.dp
+private val AlternativeActionIconSize = 28.dp
 private val EmojiHintIconTopPadding = 4.dp
 private val EmojiCommaLabelBottomPadding = 3.dp

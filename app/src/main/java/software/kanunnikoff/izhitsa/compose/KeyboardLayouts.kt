@@ -1,5 +1,8 @@
 package software.kanunnikoff.izhitsa.compose
 
+import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.sp
+
 object KeyboardKeyCodes {
     const val SHIFT = -1
     const val MODE_ALPHA = -2
@@ -25,31 +28,81 @@ enum class KeyIcon {
 }
 
 object KeyboardLayouts {
+    private val ModifierKeyLabelFontSize = 20.sp
+    private val SmallSymbolLabelFontSize = 22.sp
+    private val NumberOperatorLabelFontSize = 22.sp
+    private val NumberSpaceLabelFontSize = 28.sp
+    private val PeriodAlternatives = listOf(
+        "&", "%", "+", "\"", "-", ":", "'", "@",
+        ";", "/", "(", ")", "#", "!", ",", "?"
+    )
+
     val Symbols = listOf(
         listOf(
             key("1"), key("2"), key("3"), key("4"), key("5"),
             key("6"), key("7"), key("8"), key("9"), key("0")
         ),
         listOf(
-            key("@"), key("#"), key("₽"), key("_"), key("&"),
-            key("-"), key("+"), key("("), key(")"), key("/")
+            key("@"),
+            key("#"),
+            key(
+                label = "₽",
+                alternatives = listOf("₹", "¥", "₽", "€", "$", "¢", "£"),
+                alternativeRowLengths = listOf(3, 4),
+                preferredAlternativeIndex = 4
+            ),
+            key("_"),
+            key("&"),
+            key(
+                label = "-",
+                alternatives = listOf("—", "_", "–", "•"),
+                preferredAlternativeIndex = 1
+            ),
+            key(label = "+", alternatives = listOf("±")),
+            key("("),
+            key(")"),
+            key("/")
         ),
         listOf(
             special(
                 KeyboardKeyCodes.MORE_SYMBOLS,
                 "=\\<",
-                weight = SymbolModifierKeyWeight
+                weight = SymbolModifierKeyWeight,
+                fontSize = ModifierKeyLabelFontSize
             ),
-            key("*"), key("\""), key("'"), key(":"), key(";"), key("!"), key("?"),
+            key("*"),
+            key(
+                label = "\"",
+                alternatives = listOf("“", "„", "”", "«", "»"),
+                preferredAlternativeIndex = 2
+            ),
+            key(
+                label = "'",
+                alternatives = listOf("‘", "‚", "’", "‹", "›"),
+                preferredAlternativeIndex = 2
+            ),
+            key(":"),
+            key(";"),
+            key(label = "!", alternatives = listOf("¡")),
+            key(label = "?", alternatives = listOf("¿", "‽")),
             iconKey(
                 KeyboardKeyCodes.DELETE,
                 KeyIcon.BACKSPACE,
-                weight = SymbolModifierKeyWeight
+                weight = SymbolModifierKeyWeight,
+                repeatOnLongPress = true
             )
         ),
         listOf(
-            special(KeyboardKeyCodes.MODE_ALPHA, "АБВ", weight = BottomPillKeyWeight),
-            emojiCommaKey(),
+            special(
+                KeyboardKeyCodes.MODE_ALPHA,
+                "АБВ",
+                weight = BottomPillKeyWeight,
+                fontSize = ModifierKeyLabelFontSize
+            ),
+            special(
+                code = ",".first().code,
+                label = ","
+            ),
             KeyInfo(
                 code = KeyboardKeyCodes.NUMBER_PAD,
                 icon = KeyIcon.NUMBER_PAD,
@@ -61,19 +114,59 @@ object KeyboardLayouts {
                 label = "Русский",
                 weight = SpacebarKeyWeight
             ),
-            key("."),
+            periodKey(),
             enterKey()
         )
     )
 
     val Symbols2 = listOf(
         listOf(
-            key("~"), key("`"), key("|"), key("•"), key("√"),
-            key("π"), key("÷"), key("×"), key("§"), key("Δ")
+            key("~"),
+            key("`"),
+            key("|"),
+            key(
+                label = "•",
+                alternatives = listOf("♣", "♠", "♪", "♥", "♦"),
+                preferredAlternativeIndex = 2
+            ),
+            key("√"),
+            key(
+                label = "π",
+                alternatives = listOf("Ω", "Π", "μ"),
+                preferredAlternativeIndex = 1
+            ),
+            key("÷"),
+            key("×"),
+            key(label = "§", alternatives = listOf("¶")),
+            key("Δ")
         ),
         listOf(
-            key("£"), key("€"), key("$"), key("¢"), key("^"),
-            key("°"), key("="), key("{"), key("}"), key("\\")
+            key("£"),
+            key("€"),
+            key(
+                label = "$",
+                alternatives = listOf("₹", "¥", "₽", "€", "¢", "£"),
+                alternativeRowLengths = listOf(3, 3),
+                preferredAlternativeIndex = 4
+            ),
+            key("¢"),
+            key(
+                label = "^",
+                alternatives = listOf("←", "↑", "↓", "→"),
+                preferredAlternativeIndex = 1
+            ),
+            key(
+                label = "°",
+                alternatives = listOf("′", "″")
+            ),
+            key(
+                label = "=",
+                alternatives = listOf("∞", "≠", "≈"),
+                preferredAlternativeIndex = 1
+            ),
+            key("{"),
+            key("}"),
+            key("\\")
         ),
         listOf(
             special(
@@ -81,16 +174,31 @@ object KeyboardLayouts {
                 "?123",
                 weight = SymbolModifierKeyWeight
             ),
-            key("%"), key("©"), key("®"), key("™"), key("✓"), key("["), key("]"),
+            key(
+                label = "%",
+                alternatives = listOf("‰", "‱")
+            ),
+            key(label = "©", fontSize = SmallSymbolLabelFontSize),
+            key(label = "®", fontSize = SmallSymbolLabelFontSize),
+            key("™"),
+            key("✓"),
+            key("["),
+            key("]"),
             iconKey(
                 KeyboardKeyCodes.DELETE,
                 KeyIcon.BACKSPACE,
-                weight = SymbolModifierKeyWeight
+                weight = SymbolModifierKeyWeight,
+                repeatOnLongPress = true
             )
         ),
         listOf(
-            special(KeyboardKeyCodes.MODE_ALPHA, "АБВ", weight = BottomPillKeyWeight),
-            key("<"),
+            special(
+                KeyboardKeyCodes.MODE_ALPHA,
+                "АБВ",
+                weight = BottomPillKeyWeight,
+                fontSize = ModifierKeyLabelFontSize
+            ),
+            key(label = "<", fontSize = SmallSymbolLabelFontSize),
             KeyInfo(
                 code = KeyboardKeyCodes.NUMBER_PAD,
                 icon = KeyIcon.NUMBER_PAD,
@@ -102,27 +210,33 @@ object KeyboardLayouts {
                 label = "Русский",
                 weight = SpacebarKeyWeight
             ),
-            key(">"),
+            key(label = ">", fontSize = SmallSymbolLabelFontSize),
             enterKey()
         )
     )
 
     val Russian = listOf(
         listOf(
-            key("й", hint = "1"),
-            key("ц", hint = "2"),
-            key("у", hint = "3"),
-            key("к", hint = "4"),
+            digitHintKey(label = "й", digit = "1"),
+            digitHintKey(label = "ц", digit = "2"),
+            digitHintKey(
+                label = "у",
+                digit = "3",
+                alternatives = listOf(acute("у"))
+            ),
+            digitHintKey(label = "к", digit = "4"),
             key(
                 label = "е",
                 hint = "5",
-                alternatives = listOf("е", "ѣ", "ё")
+                alternatives = listOf("е", "ѣ", "ё", "5", acute("е")),
+                tapAlternatives = listOf("е", "ѣ", "ё"),
+                preferredAlternativeIndex = 3
             ),
-            key("н", hint = "6"),
-            key("г", hint = "7"),
-            key("ш", hint = "8"),
-            key("щ", hint = "9"),
-            key("з", hint = "0"),
+            digitHintKey(label = "н", digit = "6"),
+            digitHintKey(label = "г", digit = "7"),
+            digitHintKey(label = "ш", digit = "8"),
+            digitHintKey(label = "щ", digit = "9"),
+            digitHintKey(label = "з", digit = "0"),
             key("х")
         ),
         listOf(
@@ -130,25 +244,43 @@ object KeyboardLayouts {
                 label = "ф",
                 alternatives = listOf("ф", "ѳ")
             ),
-            key("ы"), key("в"), key("а"), key("п"), key("р"),
-            key("о"), key("л"), key("д"), key("ж"), key("э")
+            vowelKey("ы"),
+            key("в"),
+            vowelKey("а"),
+            key("п"),
+            key("р"),
+            vowelKey("о"),
+            key("л"),
+            key("д"),
+            key("ж"),
+            vowelKey("э")
         ),
         listOf(
             iconKey(KeyboardKeyCodes.SHIFT, KeyIcon.SHIFT, weight = ModifierKeyWeight),
-            key("я"), key("ч"), key("с"), key("м"),
+            vowelKey("я"),
+            key("ч"),
+            key("с"),
+            key("м"),
             key(
                 label = "и",
-                alternatives = listOf("и", "i", "ѵ")
+                alternatives = listOf("и", "i", "ѵ", acute("и")),
+                tapAlternatives = listOf("и", "i", "ѵ")
             ),
             key("т"),
             key(
                 label = "ь",
                 alternatives = listOf("ь", "ъ")
             ),
-            key("б"), key("ю"),
-            iconKey(KeyboardKeyCodes.DELETE, KeyIcon.BACKSPACE, weight = ModifierKeyWeight)
+            key("б"),
+            vowelKey("ю"),
+            iconKey(
+                KeyboardKeyCodes.DELETE,
+                KeyIcon.BACKSPACE,
+                weight = ModifierKeyWeight,
+                repeatOnLongPress = true
+            )
         ),
-        alphabetBottomRow(language = "Русский")
+        alphabetBottomRow(language = "Русскій")
     )
 
     val English = listOf(
@@ -201,38 +333,62 @@ object KeyboardLayouts {
                 alternatives = listOf("n", "ñ")
             ),
             key("m"),
-            iconKey(KeyboardKeyCodes.DELETE, KeyIcon.BACKSPACE, weight = ModifierKeyWeight)
+            iconKey(
+                KeyboardKeyCodes.DELETE,
+                KeyIcon.BACKSPACE,
+                weight = ModifierKeyWeight,
+                repeatOnLongPress = true
+            )
         ),
         alphabetBottomRow(language = "English")
     )
 
     val Numbers = listOf(
         listOf(
-            key("+", weight = 0.8f),
+            key("+", weight = 0.8f, fontSize = NumberOperatorLabelFontSize),
             key("1", weight = 1.25f),
             key("2", weight = 1.25f),
             key("3", weight = 1.25f),
             special(code = "%".first().code, label = "%", weight = 0.8f)
         ),
         listOf(
-            key("-", weight = 0.8f),
+            key("-", weight = 0.8f, fontSize = NumberOperatorLabelFontSize),
             key("4", weight = 1.25f),
             key("5", weight = 1.25f),
             key("6", weight = 1.25f),
-            special(code = KeyboardKeyCodes.SPACE, label = "␣", weight = 0.8f)
+            special(
+                code = KeyboardKeyCodes.SPACE,
+                label = "␣",
+                weight = 0.8f,
+                fontSize = NumberSpaceLabelFontSize
+            )
         ),
         listOf(
-            key("*", weight = 0.8f),
+            key("*", weight = 0.8f, fontSize = NumberOperatorLabelFontSize),
             key("7", weight = 1.25f),
             key("8", weight = 1.25f),
             key("9", weight = 1.25f),
-            iconKey(KeyboardKeyCodes.DELETE, KeyIcon.BACKSPACE, weight = 0.8f)
+            iconKey(
+                KeyboardKeyCodes.DELETE,
+                KeyIcon.BACKSPACE,
+                weight = 0.8f,
+                repeatOnLongPress = true
+            )
         ),
         listOf(
-            key("/", weight = 0.8f),
-            special(KeyboardKeyCodes.MODE_ALPHA, "АБВ", weight = 1.1f),
+            key("/", weight = 0.8f, fontSize = NumberOperatorLabelFontSize),
+            special(
+                KeyboardKeyCodes.MODE_ALPHA,
+                "АБВ",
+                weight = 1.1f,
+                fontSize = ModifierKeyLabelFontSize
+            ),
             key(",", weight = 0.72f),
-            special(KeyboardKeyCodes.SYMBOLS, "!?#"),
+            special(
+                KeyboardKeyCodes.SYMBOLS,
+                "!?#",
+                fontSize = ModifierKeyLabelFontSize
+            ),
             key("0", weight = 1.8f),
             key("=", weight = 0.95f),
             key(".", weight = 0.72f),
@@ -255,11 +411,7 @@ object KeyboardLayouts {
                 label = language,
                 weight = SpacebarKeyWeight
             ),
-            special(
-                code = ".".first().code,
-                label = ".",
-                weight = BottomSquareKeyWeight
-            ),
+            periodKey(),
             enterKey()
         )
     }
@@ -280,18 +432,37 @@ object KeyboardLayouts {
         )
     }
 
+    private fun periodKey(): KeyInfo {
+        return special(
+            code = ".".first().code,
+            label = ".",
+            weight = BottomSquareKeyWeight,
+            alternatives = PeriodAlternatives,
+            alternativeRowLengths = listOf(8, 8),
+            preferredAlternativeIndex = 14
+        )
+    }
+
     private fun key(
         label: String,
         hint: String? = null,
         alternatives: List<String> = emptyList(),
-        weight: Float = 1f
+        tapAlternatives: List<String> = alternatives,
+        alternativeRowLengths: List<Int> = emptyList(),
+        preferredAlternativeIndex: Int? = null,
+        weight: Float = 1f,
+        fontSize: TextUnit? = null
     ): KeyInfo {
         return KeyInfo(
             code = label.first().code,
             label = label,
             hint = hint,
             alternatives = alternatives,
-            weight = weight
+            tapAlternatives = tapAlternatives,
+            alternativeRowLengths = alternativeRowLengths,
+            preferredAlternativeIndex = preferredAlternativeIndex,
+            weight = weight,
+            fontSize = fontSize
         )
     }
 
@@ -299,13 +470,21 @@ object KeyboardLayouts {
         code: Int,
         label: String? = null,
         icon: KeyIcon? = null,
-        weight: Float = 1f
+        weight: Float = 1f,
+        fontSize: TextUnit? = null,
+        alternatives: List<String> = emptyList(),
+        alternativeRowLengths: List<Int> = emptyList(),
+        preferredAlternativeIndex: Int? = null
     ): KeyInfo {
         return KeyInfo(
             code = code,
             label = label,
             icon = icon,
+            alternatives = alternatives,
+            alternativeRowLengths = alternativeRowLengths,
+            preferredAlternativeIndex = preferredAlternativeIndex,
             weight = weight,
+            fontSize = fontSize,
             isModifier = true
         )
     }
@@ -313,13 +492,14 @@ object KeyboardLayouts {
     private fun iconKey(
         code: Int,
         icon: KeyIcon,
-        weight: Float
+        weight: Float,
+        repeatOnLongPress: Boolean = false
     ): KeyInfo {
         return special(
             code = code,
             icon = icon,
             weight = weight
-        )
+        ).copy(repeatOnLongPress = repeatOnLongPress)
     }
 
     private fun enterKey(weight: Float = BottomPillKeyWeight): KeyInfo {
@@ -329,6 +509,34 @@ object KeyboardLayouts {
             weight = weight,
             isModifier = true
         )
+    }
+
+    private fun digitHintKey(
+        label: String,
+        digit: String,
+        alternatives: List<String> = emptyList()
+    ): KeyInfo {
+        val menuAlternatives = alternatives + digit
+
+        return key(
+            label = label,
+            hint = digit,
+            alternatives = menuAlternatives,
+            tapAlternatives = emptyList(),
+            preferredAlternativeIndex = menuAlternatives.lastIndex
+        )
+    }
+
+    private fun vowelKey(label: String): KeyInfo {
+        return key(
+            label = label,
+            alternatives = listOf(acute(label)),
+            tapAlternatives = emptyList()
+        )
+    }
+
+    private fun acute(letter: String): String {
+        return letter + CombiningAcuteAccent
     }
 
     /*
@@ -341,4 +549,5 @@ object KeyboardLayouts {
     private const val BottomPillKeyWeight = 1.58f
     private const val BottomSquareKeyWeight = 1f
     private const val SpacebarKeyWeight = 4.45f
+    private const val CombiningAcuteAccent = "\u0301"
 }

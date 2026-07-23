@@ -310,26 +310,56 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         publishLayout(baseLayout)
     }
 
-    private fun onKey(key: KeyInfo) {
-        when {
+    private fun onKey(key: KeyInfo): Boolean {
+        val handled = when {
             isWordSeparator(code = key.code) -> {
                 alternativeTap = null
                 currentInputConnection?.let(::commitTyped)
                 sendKey(keyCode = key.code)
                 updateAutomaticShift()
+                true
             }
 
             key.code == KeyboardKeyCodes.DELETE -> handleBackspace()
-            key.code == KeyboardKeyCodes.SHIFT -> handleShift()
-            key.code == KeyboardKeyCodes.MODE_ALPHA -> showAlphabetLayout()
-            key.code == KeyboardKeyCodes.SYMBOLS -> showSymbolsLayout()
-            key.code == KeyboardKeyCodes.MORE_SYMBOLS -> showMoreSymbolsLayout()
-            key.code == KeyboardKeyCodes.NUMBER_PAD -> showNumberPadLayout()
-            key.code == KeyboardKeyCodes.LANGUAGE -> switchLanguage()
-            else -> handleCharacter(key = key)
+            key.code == KeyboardKeyCodes.SHIFT -> {
+                handleShift()
+                true
+            }
+
+            key.code == KeyboardKeyCodes.MODE_ALPHA -> {
+                showAlphabetLayout()
+                true
+            }
+
+            key.code == KeyboardKeyCodes.SYMBOLS -> {
+                showSymbolsLayout()
+                true
+            }
+
+            key.code == KeyboardKeyCodes.MORE_SYMBOLS -> {
+                showMoreSymbolsLayout()
+                true
+            }
+
+            key.code == KeyboardKeyCodes.NUMBER_PAD -> {
+                showNumberPadLayout()
+                true
+            }
+
+            key.code == KeyboardKeyCodes.LANGUAGE -> {
+                switchLanguage()
+                true
+            }
+
+            else -> {
+                handleCharacter(key = key)
+                true
+            }
         }
 
         refreshTextState()
+
+        return handled
     }
 
     private fun handleKeyLongPressAction(action: KeyLongPressAction) {
@@ -361,15 +391,15 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         val label = key.label ?: key.code.toChar().toString()
         val now = System.currentTimeMillis()
         val previousTap = alternativeTap
-        val canCycleAlternative = key.alternatives.size > 1 &&
+        val canCycleAlternative = key.tapAlternatives.size > 1 &&
             previousTap != null &&
             previousTap.keyCode == key.code &&
             now - previousTap.timestampMillis <= AlternativeTapTimeoutMillis
 
         if (canCycleAlternative) {
-            val nextIndex = (previousTap.alternativeIndex + 1) % key.alternatives.size
-            val previousAlternative = key.alternatives[previousTap.alternativeIndex]
-            val nextAlternative = key.alternatives[nextIndex]
+            val nextIndex = (previousTap.alternativeIndex + 1) % key.tapAlternatives.size
+            val previousAlternative = key.tapAlternatives[previousTap.alternativeIndex]
+            val nextAlternative = key.tapAlternatives[nextIndex]
 
             replaceLastInput(
                 previousText = previousAlternative,
@@ -387,10 +417,10 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
                 useComposingRegion = predictionEnabled && inputClass == InputType.TYPE_CLASS_TEXT
             )
 
-            alternativeTap = if (key.alternatives.size > 1) {
+            alternativeTap = if (key.tapAlternatives.size > 1) {
                 AlternativeTap(
                     keyCode = key.code,
-                    alternativeIndex = key.alternatives.indexOf(label).coerceAtLeast(0),
+                    alternativeIndex = key.tapAlternatives.indexOf(label).coerceAtLeast(0),
                     timestampMillis = now
                 )
             } else {
@@ -510,11 +540,12 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         composingText.clear()
     }
 
-    private fun handleBackspace() {
-        val inputConnection = currentInputConnection ?: return
+    private fun handleBackspace(): Boolean {
+        val inputConnection = currentInputConnection ?: return false
         alternativeTap = null
+        val selectedText = inputConnection.getSelectedText(0)
 
-        when {
+        val deleted = when {
             composingText.isNotEmpty() -> {
                 val lastCodePointStart = composingText.offsetByCodePoints(
                     composingText.length,
@@ -527,19 +558,26 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
                 } else {
                     inputConnection.setComposingText(composingText, 1)
                 }
+
+                true
             }
 
-            !inputConnection.getSelectedText(0).isNullOrEmpty() -> {
+            !selectedText.isNullOrEmpty() -> {
                 inputConnection.commitText("", 1)
             }
 
-            else -> {
+            !inputConnection.getTextBeforeCursor(1, 0).isNullOrEmpty() -> {
                 inputConnection.deleteSurroundingTextInCodePoints(1, 0)
             }
+
+            else -> false
         }
 
-        updateAutomaticShift()
-        refreshTextState()
+        if (deleted) {
+            updateAutomaticShift()
+        }
+
+        return deleted
     }
 
     private fun handleShift() {
@@ -687,11 +725,20 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
                                 alternative.lowercase(Locale.getDefault())
                             }
                         }
+                        val transformedTapAlternatives =
+                            key.tapAlternatives.map { alternative ->
+                                if (enabled) {
+                                    alternative.uppercase(Locale.getDefault())
+                                } else {
+                                    alternative.lowercase(Locale.getDefault())
+                                }
+                            }
 
                         key.copy(
                             code = transformedLabel.first().code,
                             label = transformedLabel,
-                            alternatives = transformedAlternatives
+                            alternatives = transformedAlternatives,
+                            tapAlternatives = transformedTapAlternatives
                         )
                     }
 
