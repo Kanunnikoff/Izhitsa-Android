@@ -66,12 +66,14 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -132,10 +134,7 @@ fun KeyboardScreen(
 ) {
     val isDark = isSystemInDarkTheme()
     val palette = keyboardPalette(isDark = isDark)
-    val bottomInset = WindowInsets.navigationBars
-        .only(WindowInsetsSides.Bottom)
-        .asPaddingValues()
-        .calculateBottomPadding()
+    val bottomInset = keyboardBottomInset()
 
     Column(
         modifier = Modifier
@@ -248,6 +247,43 @@ fun KeyboardScreen(
             }
         }
     }
+}
+
+@Suppress("DiscouragedApi")
+@Composable
+private fun keyboardBottomInset(): Dp {
+    val navigationBarInset = WindowInsets.navigationBars
+        .only(WindowInsetsSides.Bottom)
+        .asPaddingValues()
+        .calculateBottomPadding()
+    val resources = LocalContext.current.resources
+    val density = LocalDensity.current
+    val navigationAreaHeightResourceId = remember(resources) {
+        resources.getIdentifier(
+            InputMethodNavigationBarHeightResourceName,
+            DimensionResourceType,
+            AndroidResourcePackage
+        ).takeIf { resourceId -> resourceId != 0 }
+            ?: resources.getIdentifier(
+                NavigationBarFrameHeightResourceName,
+                DimensionResourceType,
+                AndroidResourcePackage
+            )
+    }
+    val navigationAreaHeight = if (navigationAreaHeightResourceId == 0) {
+        0.dp
+    } else {
+        with(density) {
+            resources.getDimensionPixelSize(navigationAreaHeightResourceId).toDp()
+        }
+    }
+
+    // При жестовом управлении navigationBars сообщает только высоту области распознавания
+    // жеста, тогда как системная клавиатура оставляет всю область навигационной панели.
+    // Специальный системный размер даёт ту же высоту, а максимум с фактическим отступом
+    // не удваивает пространство при кнопочном управлении. На старых версиях Android,
+    // где специального размера ещё нет, используется совместимый размер рамки панели.
+    return maxOf(navigationBarInset, navigationAreaHeight) + KeyboardNavigationContentGap
 }
 
 @Composable
@@ -1056,6 +1092,11 @@ private const val FirstEmojiCategoryPosition = 2
 private const val StickerColumnCount = 2
 private const val PressAnimationDurationMillis = 70
 private const val PressedKeyScale = 0.96f
+private const val AndroidResourcePackage = "android"
+private const val DimensionResourceType = "dimen"
+private const val InputMethodNavigationBarHeightResourceName =
+    "input_method_navigation_bar_height"
+private const val NavigationBarFrameHeightResourceName = "navigation_bar_frame_height"
 
 private val ToolbarHeight = 50.dp
 private val KeyHeight = 49.dp
@@ -1063,6 +1104,7 @@ private val KeyGap = 5.dp
 private val KeyCornerRadius = 10.dp
 private val KeyboardHorizontalPadding = 6.dp
 private val KeyboardVerticalPadding = 6.dp
+private val KeyboardNavigationContentGap = 6.dp
 private val PanelBodyHeight = 160.dp
 private val EmojiPanelBodyHeight = 270.dp
 private val StickerPanelBodyHeight = 270.dp
