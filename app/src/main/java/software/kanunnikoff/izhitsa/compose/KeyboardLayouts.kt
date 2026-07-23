@@ -6,6 +6,7 @@ object KeyboardKeyCodes {
     const val MORE_SYMBOLS = -4
     const val DELETE = -5
     const val SYMBOLS = -6
+    const val NUMBER_PAD = -7
     const val LANGUAGE = -101
     const val ENTER = 10
     const val SPACE = 32
@@ -19,7 +20,8 @@ enum class KeyIcon {
     LANGUAGE,
     SEARCH,
     SEND,
-    SHIFT
+    SHIFT,
+    NUMBER_PAD
 }
 
 object KeyboardLayouts {
@@ -33,17 +35,31 @@ object KeyboardLayouts {
             key("-"), key("+"), key("("), key(")"), key("/")
         ),
         listOf(
-            special(KeyboardKeyCodes.MORE_SYMBOLS, "=\\", weight = 1.5f),
+            special(
+                KeyboardKeyCodes.MORE_SYMBOLS,
+                "=\\<",
+                weight = SymbolModifierKeyWeight
+            ),
             key("*"), key("\""), key("'"), key(":"), key(";"), key("!"), key("?"),
-            iconKey(KeyboardKeyCodes.DELETE, KeyIcon.BACKSPACE, weight = 1.5f)
+            iconKey(
+                KeyboardKeyCodes.DELETE,
+                KeyIcon.BACKSPACE,
+                weight = SymbolModifierKeyWeight
+            )
         ),
         listOf(
-            special(KeyboardKeyCodes.MODE_ALPHA, "АБВ", weight = 1.5f),
+            special(KeyboardKeyCodes.MODE_ALPHA, "АБВ", weight = BottomPillKeyWeight),
             emojiCommaKey(),
+            KeyInfo(
+                code = KeyboardKeyCodes.NUMBER_PAD,
+                icon = KeyIcon.NUMBER_PAD,
+                weight = BottomSquareKeyWeight,
+                isModifier = false
+            ),
             KeyInfo(
                 code = KeyboardKeyCodes.SPACE,
                 label = "Русский",
-                weight = 4f
+                weight = SpacebarKeyWeight
             ),
             key("."),
             enterKey()
@@ -60,17 +76,31 @@ object KeyboardLayouts {
             key("°"), key("="), key("{"), key("}"), key("\\")
         ),
         listOf(
-            special(KeyboardKeyCodes.SYMBOLS, "?123", weight = 1.5f),
+            special(
+                KeyboardKeyCodes.SYMBOLS,
+                "?123",
+                weight = SymbolModifierKeyWeight
+            ),
             key("%"), key("©"), key("®"), key("™"), key("✓"), key("["), key("]"),
-            iconKey(KeyboardKeyCodes.DELETE, KeyIcon.BACKSPACE, weight = 1.5f)
+            iconKey(
+                KeyboardKeyCodes.DELETE,
+                KeyIcon.BACKSPACE,
+                weight = SymbolModifierKeyWeight
+            )
         ),
         listOf(
-            special(KeyboardKeyCodes.MODE_ALPHA, "АБВ", weight = 1.5f),
+            special(KeyboardKeyCodes.MODE_ALPHA, "АБВ", weight = BottomPillKeyWeight),
             key("<"),
+            KeyInfo(
+                code = KeyboardKeyCodes.NUMBER_PAD,
+                icon = KeyIcon.NUMBER_PAD,
+                weight = BottomSquareKeyWeight,
+                isModifier = false
+            ),
             KeyInfo(
                 code = KeyboardKeyCodes.SPACE,
                 label = "Русский",
-                weight = 4f
+                weight = SpacebarKeyWeight
             ),
             key(">"),
             enterKey()
@@ -104,7 +134,7 @@ object KeyboardLayouts {
             key("о"), key("л"), key("д"), key("ж"), key("э")
         ),
         listOf(
-            iconKey(KeyboardKeyCodes.SHIFT, KeyIcon.SHIFT, weight = 1.5f),
+            iconKey(KeyboardKeyCodes.SHIFT, KeyIcon.SHIFT, weight = ModifierKeyWeight),
             key("я"), key("ч"), key("с"), key("м"),
             key(
                 label = "и",
@@ -116,7 +146,7 @@ object KeyboardLayouts {
                 alternatives = listOf("ь", "ъ")
             ),
             key("б"), key("ю"),
-            iconKey(KeyboardKeyCodes.DELETE, KeyIcon.BACKSPACE, weight = 1.5f)
+            iconKey(KeyboardKeyCodes.DELETE, KeyIcon.BACKSPACE, weight = ModifierKeyWeight)
         ),
         alphabetBottomRow(language = "Русский")
     )
@@ -159,7 +189,7 @@ object KeyboardLayouts {
             key("j"), key("k"), key("l")
         ),
         listOf(
-            iconKey(KeyboardKeyCodes.SHIFT, KeyIcon.SHIFT, weight = 1.5f),
+            iconKey(KeyboardKeyCodes.SHIFT, KeyIcon.SHIFT, weight = ModifierKeyWeight),
             key("z"), key("x"),
             key(
                 label = "c",
@@ -171,7 +201,7 @@ object KeyboardLayouts {
                 alternatives = listOf("n", "ñ")
             ),
             key("m"),
-            iconKey(KeyboardKeyCodes.DELETE, KeyIcon.BACKSPACE, weight = 1.5f)
+            iconKey(KeyboardKeyCodes.DELETE, KeyIcon.BACKSPACE, weight = ModifierKeyWeight)
         ),
         alphabetBottomRow(language = "English")
     )
@@ -212,15 +242,24 @@ object KeyboardLayouts {
 
     private fun alphabetBottomRow(language: String): List<KeyInfo> {
         return listOf(
-            special(KeyboardKeyCodes.SYMBOLS, "?123", weight = 1.5f),
-            emojiCommaKey(weight = 0.9f),
-            special(KeyboardKeyCodes.LANGUAGE, icon = KeyIcon.LANGUAGE, weight = 0.9f),
+            special(KeyboardKeyCodes.SYMBOLS, "?123", weight = BottomPillKeyWeight),
+            emojiCommaKey(weight = BottomSquareKeyWeight),
+            KeyInfo(
+                code = KeyboardKeyCodes.LANGUAGE,
+                icon = KeyIcon.LANGUAGE,
+                weight = BottomSquareKeyWeight,
+                isModifier = false
+            ),
             KeyInfo(
                 code = KeyboardKeyCodes.SPACE,
                 label = language,
-                weight = 4f
+                weight = SpacebarKeyWeight
             ),
-            key(".", weight = 0.9f),
+            special(
+                code = ".".first().code,
+                label = ".",
+                weight = BottomSquareKeyWeight
+            ),
             enterKey()
         )
     }
@@ -236,7 +275,8 @@ object KeyboardLayouts {
             label = ",",
             hintIcon = KeyIcon.EMOJI,
             longPressAction = KeyLongPressAction.SHOW_EMOJI,
-            weight = weight
+            weight = weight,
+            isModifier = true
         )
     }
 
@@ -282,7 +322,7 @@ object KeyboardLayouts {
         )
     }
 
-    private fun enterKey(weight: Float = 1.5f): KeyInfo {
+    private fun enterKey(weight: Float = BottomPillKeyWeight): KeyInfo {
         return KeyInfo(
             code = KeyboardKeyCodes.ENTER,
             icon = KeyIcon.ENTER,
@@ -290,4 +330,15 @@ object KeyboardLayouts {
             isModifier = true
         )
     }
+
+    /*
+     * Весовые коэффициенты восстановлены по снимку Gboard на экране 1080 пикселей
+     * при плотности 420 dpi. Они сохраняют одинаковые пропорции и на других
+     * размерах, поскольку Compose распределяет доступную ширину относительно.
+     */
+    private const val ModifierKeyWeight = 1.35f
+    private const val SymbolModifierKeyWeight = 1.58f
+    private const val BottomPillKeyWeight = 1.58f
+    private const val BottomSquareKeyWeight = 1f
+    private const val SpacebarKeyWeight = 4.45f
 }

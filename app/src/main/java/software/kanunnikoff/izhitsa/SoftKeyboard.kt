@@ -324,6 +324,7 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
             key.code == KeyboardKeyCodes.MODE_ALPHA -> showAlphabetLayout()
             key.code == KeyboardKeyCodes.SYMBOLS -> showSymbolsLayout()
             key.code == KeyboardKeyCodes.MORE_SYMBOLS -> showMoreSymbolsLayout()
+            key.code == KeyboardKeyCodes.NUMBER_PAD -> showNumberPadLayout()
             key.code == KeyboardKeyCodes.LANGUAGE -> switchLanguage()
             else -> handleCharacter(key = key)
         }
@@ -619,6 +620,13 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         layoutMode = LayoutMode.SYMBOLS2
         shiftState = ShiftState.OFF
         publishLayout(KeyboardLayouts.Symbols2)
+    }
+
+    private fun showNumberPadLayout() {
+        layoutMode = LayoutMode.NUMBERS
+        shiftState = ShiftState.OFF
+        currentPanel.value = KeyboardPanel.KEYS
+        publishLayout(KeyboardLayouts.Numbers)
     }
 
     private fun switchLanguage() {

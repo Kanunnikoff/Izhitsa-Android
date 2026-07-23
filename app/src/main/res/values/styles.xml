@@ -31,20 +31,20 @@
     </style>
 
     <style name="KeyboardEmojiPickerLight" parent="Theme.MaterialComponents.Light.NoActionBar">
-        <item name="android:colorBackground">#F7F7FF</item>
-        <item name="colorSurface">#F7F7FF</item>
-        <item name="colorPrimary">#0B57D0</item>
-        <item name="colorControlNormal">#5F6368</item>
-        <item name="android:textColorPrimary">#202124</item>
+        <item name="android:colorBackground">#EEEDF4</item>
+        <item name="colorSurface">#EEEDF4</item>
+        <item name="colorPrimary">#475D92</item>
+        <item name="colorControlNormal">#45464F</item>
+        <item name="android:textColorPrimary">#1B1B1F</item>
         <item name="android:fontFamily">sans</item>
     </style>
 
     <style name="KeyboardEmojiPickerDark" parent="Theme.MaterialComponents.NoActionBar">
-        <item name="android:colorBackground">#202124</item>
-        <item name="colorSurface">#202124</item>
-        <item name="colorPrimary">#A8C7FA</item>
-        <item name="colorControlNormal">#BDC1C6</item>
-        <item name="android:textColorPrimary">#F1F3F4</item>
+        <item name="android:colorBackground">#1E1F25</item>
+        <item name="colorSurface">#1E1F25</item>
+        <item name="colorPrimary">#AFC6FF</item>
+        <item name="colorControlNormal">#C4C6D0</item>
+        <item name="android:textColorPrimary">#E2E2E9</item>
         <item name="android:fontFamily">sans</item>
     </style>
 
