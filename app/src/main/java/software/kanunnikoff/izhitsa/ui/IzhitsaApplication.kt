@@ -74,6 +74,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -819,13 +820,7 @@ private fun AboutScreen(
                         .padding(14.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Image(
-                        painter = painterResource(R.mipmap.ic_launcher),
-                        contentDescription = null,
-                        modifier = Modifier
-                            .size(65.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                    )
+                    AboutApplicationIcon()
 
                     Column(
                         modifier = Modifier.padding(start = 12.dp)
@@ -985,6 +980,29 @@ private fun AboutScreen(
                 sectionTitle = "Поддержка"
             )
         }
+    }
+}
+
+@Composable
+private fun AboutApplicationIcon() {
+    /*
+     * На Android 8 и новее ic_launcher разрешается в XML adaptive-icon,
+     * который painterResource не поддерживает. Передний слой хранится как
+     * обычный PNG и содержит безопасные поля адаптивного значка. Масштаб
+     * убирает эти поля, чтобы внутри карточки осталось исходное изображение.
+     */
+    Box(
+        modifier = Modifier
+            .size(AboutApplicationIconSize)
+            .clip(RoundedCornerShape(AboutApplicationIconCornerRadius))
+    ) {
+        Image(
+            painter = painterResource(R.mipmap.ic_launcher_adaptive_fore),
+            contentDescription = null,
+            modifier = Modifier
+                .fillMaxSize()
+                .scale(AdaptiveIconArtworkScale)
+        )
     }
 }
 
@@ -1160,4 +1178,7 @@ private val GridSpacing = 12.dp
 private val DividerPadding = 80.dp
 private val ListTextPadding = 16.dp
 private val SettingsSectionCornerRadius = 24.dp
+private val AboutApplicationIconSize = 65.dp
+private val AboutApplicationIconCornerRadius = 8.dp
 private val SuccessGreen = Color(0xFF34C759)
+private const val AdaptiveIconArtworkScale = 1.5f

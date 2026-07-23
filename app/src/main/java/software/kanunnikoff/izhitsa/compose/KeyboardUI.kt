@@ -48,6 +48,7 @@ import androidx.compose.material.icons.rounded.KeyboardCapslock
 import androidx.compose.material.icons.rounded.Language
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
@@ -130,13 +131,17 @@ enum class KeyLongPressAction {
 
 enum class KeyboardPanel {
     KEYS,
+    ACTIONS,
     EMOJI,
     STICKERS,
     CLIPBOARD
 }
 
 enum class KeyboardToolbarAction {
-    SWITCH_INPUT_METHOD,
+    OPEN_ACTIONS,
+    SHARE_APP,
+    NEXT_LANGUAGE,
+    EMOJI,
     STICKERS,
     CLIPBOARD,
     SETTINGS
@@ -212,6 +217,19 @@ fun KeyboardScreen(
                             }
                         )
                     }
+                }
+
+                KeyboardPanel.ACTIONS -> {
+                    ActionsPanelToolbar(
+                        palette = palette,
+                        onBack = onClosePanel,
+                        onToolbarAction = onToolbarAction
+                    )
+
+                    ActionsPanel(
+                        palette = palette,
+                        onToolbarAction = onToolbarAction
+                    )
                 }
 
                 KeyboardPanel.EMOJI -> {
@@ -384,9 +402,9 @@ private fun KeyboardToolbar(
         } else {
             ToolbarIcon(
                 imageVector = Icons.Rounded.GridView,
-                contentDescription = "Сменить клавиатуру",
+                contentDescription = "Открыть действия",
                 palette = palette,
-                onClick = { onToolbarAction(KeyboardToolbarAction.SWITCH_INPUT_METHOD) }
+                onClick = { onToolbarAction(KeyboardToolbarAction.OPEN_ACTIONS) }
             )
 
             ToolbarIcon(
@@ -414,6 +432,121 @@ private fun KeyboardToolbar(
 }
 
 @Composable
+private fun ActionsPanelToolbar(
+    palette: KeyboardPalette,
+    onBack: () -> Unit,
+    onToolbarAction: (KeyboardToolbarAction) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(ToolbarHeight),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        ToolbarIcon(
+            imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+            contentDescription = "Вернуться к клавишам",
+            palette = palette,
+            onClick = onBack
+        )
+
+        ToolbarIcon(
+            imageVector = Icons.Rounded.Collections,
+            contentDescription = "Стикеры",
+            palette = palette,
+            onClick = { onToolbarAction(KeyboardToolbarAction.STICKERS) }
+        )
+
+        ToolbarIcon(
+            imageVector = Icons.Rounded.ContentPaste,
+            contentDescription = "Буфер обмена",
+            palette = palette,
+            onClick = { onToolbarAction(KeyboardToolbarAction.CLIPBOARD) }
+        )
+
+        ToolbarIcon(
+            imageVector = Icons.Rounded.Settings,
+            contentDescription = "Настройки клавиатур",
+            palette = palette,
+            onClick = { onToolbarAction(KeyboardToolbarAction.SETTINGS) }
+        )
+    }
+}
+
+@Composable
+private fun ActionsPanel(
+    palette: KeyboardPalette,
+    onToolbarAction: (KeyboardToolbarAction) -> Unit
+) {
+    val actions = listOf(
+        KeyboardActionPanelItem(
+            action = KeyboardToolbarAction.SHARE_APP,
+            title = "Рассказать об Ижице",
+            icon = Icons.Rounded.Share
+        ),
+        KeyboardActionPanelItem(
+            action = KeyboardToolbarAction.NEXT_LANGUAGE,
+            title = "Следующий язык",
+            icon = Icons.Rounded.Language
+        ),
+        KeyboardActionPanelItem(
+            action = KeyboardToolbarAction.EMOJI,
+            title = "Эмодзи",
+            icon = Icons.Outlined.EmojiEmotions
+        )
+    )
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(ActionsPanelBodyHeight)
+            .padding(
+                horizontal = ActionsPanelHorizontalPadding,
+                vertical = ActionsPanelVerticalPadding
+            ),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.Top
+    ) {
+        actions.forEach { item ->
+            Column(
+                modifier = Modifier.width(ActionPanelItemWidth),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Surface(
+                    onClick = { onToolbarAction(item.action) },
+                    modifier = Modifier
+                        .width(ActionPanelCardWidth)
+                        .height(ActionPanelCardHeight),
+                    shape = RoundedCornerShape(size = ActionPanelCardCornerRadius),
+                    color = palette.key
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            imageVector = item.icon,
+                            contentDescription = item.title,
+                            tint = palette.text,
+                            modifier = Modifier.size(ActionPanelIconSize)
+                        )
+                    }
+                }
+
+                Text(
+                    text = item.title,
+                    modifier = Modifier.padding(top = ActionPanelLabelTopPadding),
+                    color = palette.text,
+                    fontSize = ActionPanelLabelFontSize,
+                    lineHeight = ActionPanelLabelLineHeight,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun ToolbarIcon(
     imageVector: ImageVector,
     contentDescription: String,
@@ -432,6 +565,12 @@ private fun ToolbarIcon(
         )
     }
 }
+
+private data class KeyboardActionPanelItem(
+    val action: KeyboardToolbarAction,
+    val title: String,
+    val icon: ImageVector
+)
 
 @Composable
 private fun PanelToolbar(
@@ -1783,6 +1922,8 @@ private val KeyboardHorizontalPadding = 4.5.dp
 private val KeyboardVerticalPadding = 6.dp
 private val KeyboardNavigationContentGap = 6.dp
 private val PanelBodyHeight = 160.dp
+private val ActionsPanelBodyHeight =
+    KeyHeight * 4 + KeyVerticalGap * 3 + KeyboardVerticalPadding * 2
 private val EmojiPanelBodyHeight = 270.dp
 private val StickerPanelBodyHeight = 270.dp
 private val StickerItemHeight = 122.dp
@@ -1808,3 +1949,13 @@ private val EmojiHintIconSize = 14.dp
 private val AlternativeActionIconSize = 28.dp
 private val EmojiHintIconTopPadding = 4.dp
 private val EmojiCommaLabelBottomPadding = 3.dp
+private val ActionsPanelHorizontalPadding = 12.dp
+private val ActionsPanelVerticalPadding = 24.dp
+private val ActionPanelItemWidth = 104.dp
+private val ActionPanelCardWidth = 80.dp
+private val ActionPanelCardHeight = 48.dp
+private val ActionPanelCardCornerRadius = 10.dp
+private val ActionPanelIconSize = 26.dp
+private val ActionPanelLabelTopPadding = 6.dp
+private val ActionPanelLabelFontSize = 14.sp
+private val ActionPanelLabelLineHeight = 17.sp

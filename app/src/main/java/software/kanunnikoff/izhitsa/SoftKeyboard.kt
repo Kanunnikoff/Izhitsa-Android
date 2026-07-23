@@ -4,7 +4,6 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.inputmethodservice.InputMethodService
-import android.os.Build
 import android.provider.Settings
 import android.text.InputType
 import android.view.KeyEvent
@@ -13,7 +12,6 @@ import android.view.inputmethod.CompletionInfo
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.ExtractedTextRequest
 import android.view.inputmethod.InputConnection
-import android.view.inputmethod.InputMethodManager
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.ComposeView
 import androidx.lifecycle.Lifecycle
@@ -674,9 +672,11 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
             KeyboardLayouts.Russian
         }
 
-        if (layoutMode == LayoutMode.ALPHA) {
-            publishCurrentMode()
-        }
+        layoutMode = LayoutMode.ALPHA
+        shiftState = ShiftState.OFF
+        currentPanel.value = KeyboardPanel.KEYS
+        publishCurrentMode()
+        updateAutomaticShift()
     }
 
     private fun publishCurrentMode() {
@@ -885,7 +885,17 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
 
     private fun handleToolbarAction(action: KeyboardToolbarAction) {
         when (action) {
-            KeyboardToolbarAction.SWITCH_INPUT_METHOD -> switchInputMethod()
+            KeyboardToolbarAction.OPEN_ACTIONS -> {
+                currentPanel.value = KeyboardPanel.ACTIONS
+            }
+
+            KeyboardToolbarAction.SHARE_APP -> shareApplication()
+
+            KeyboardToolbarAction.NEXT_LANGUAGE -> switchLanguage()
+
+            KeyboardToolbarAction.EMOJI -> {
+                currentPanel.value = KeyboardPanel.EMOJI
+            }
 
             KeyboardToolbarAction.STICKERS -> {
                 currentPanel.value = KeyboardPanel.STICKERS
@@ -900,19 +910,11 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         }
     }
 
-    @Suppress("DEPRECATION")
-    private fun switchInputMethod() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            switchToNextInputMethod(false)
-            return
-        }
-
-        val inputMethodManager = getSystemService(
-            Context.INPUT_METHOD_SERVICE
-        ) as InputMethodManager
-        val windowToken = window?.window?.attributes?.token
-
-        inputMethodManager.switchToNextInputMethod(windowToken, false)
+    private fun shareApplication() {
+        currentPanel.value = KeyboardPanel.KEYS
+        startActivity(
+            createShareApplicationIntent(packageName = packageName)
+        )
     }
 
     private fun refreshClipboardText() {
@@ -989,3 +991,26 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         const val ShiftDoubleTapTimeoutMillis = 800L
     }
 }
+
+internal fun createShareApplicationIntent(packageName: String): Intent {
+    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+        type = PlainTextMimeType
+        putExtra(
+            Intent.EXTRA_TEXT,
+            "$GooglePlayWebUrl$packageName"
+        )
+    }
+
+    /*
+     * Метод ввода работает как служба, поэтому системное меню отправки должно
+     * открываться в новой задаче, а не ожидать Activity-контекст.
+     */
+    return Intent.createChooser(shareIntent, ShareApplicationTitle).apply {
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+}
+
+private const val GooglePlayWebUrl =
+    "https://play.google.com/store/apps/details?id="
+private const val PlainTextMimeType = "text/plain"
+private const val ShareApplicationTitle = "Рассказать об Ижице"
