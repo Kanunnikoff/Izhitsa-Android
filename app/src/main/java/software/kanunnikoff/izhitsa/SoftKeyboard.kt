@@ -1,13 +1,17 @@
 package software.kanunnikoff.izhitsa
 
+import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
 import android.inputmethodservice.InputMethodService
 import android.os.Build
+import android.provider.Settings
 import android.text.InputType
 import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.CompletionInfo
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.ExtractedTextRequest
 import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputMethodManager
 import androidx.compose.runtime.mutableStateOf
@@ -23,84 +27,102 @@ import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
-import software.kanunnikoff.izhitsa.compose.KeyboardLayouts
-import software.kanunnikoff.izhitsa.compose.KeyboardScreen
+import software.kanunnikoff.izhitsa.compose.KeyIcon
 import software.kanunnikoff.izhitsa.compose.KeyInfo
+import software.kanunnikoff.izhitsa.compose.KeyboardKeyCodes
+import software.kanunnikoff.izhitsa.compose.KeyboardLayouts
+import software.kanunnikoff.izhitsa.compose.KeyboardPanel
+import software.kanunnikoff.izhitsa.compose.KeyboardScreen
+import software.kanunnikoff.izhitsa.compose.KeyboardToolbarAction
 import java.util.Locale
 
-/**
- * Example of writing an input method for a soft keyboard.
- */
 class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, SavedStateRegistryOwner {
-
-    private var mInputMethodManager: InputMethodManager? = null
-    private var mCandidateView: CandidateView? = null
-    private var mCompletions: Array<CompletionInfo>? = null
-
-    private val mComposing = StringBuilder()
-    private var mPredictionOn = false
-    private var mCompletionOn = false
+    private val composingText = StringBuilder()
+    private var completions: Array<CompletionInfo>? = null
+    private var completionSuggestions: List<String> = emptyList()
+    private var predictionEnabled = false
+    private var completionEnabled = false
+    private var sensitiveInput = false
+    private var inputClass = InputType.TYPE_CLASS_TEXT
     private var shiftState = ShiftState.OFF
-    private var mLastShiftTime: Long = 0
+    private var lastShiftTimeMillis = 0L
+    private var alternativeTap: AlternativeTap? = null
+    private var wordSeparators = ""
 
-    private var mWordSeparators: String? = null
-    
     private val currentLayout = mutableStateOf(KeyboardLayouts.Russian)
+    private val currentPanel = mutableStateOf(KeyboardPanel.KEYS)
+    private val currentSuggestions = mutableStateOf<List<String>>(emptyList())
+    private val currentClipboardText = mutableStateOf<String?>(null)
+
     private var baseLayout: List<List<KeyInfo>> = KeyboardLayouts.Russian
     private var layoutMode = LayoutMode.ALPHA
 
     private val lifecycleRegistry = LifecycleRegistry(this)
-    private val mViewModelStore = ViewModelStore()
+    private val keyboardViewModelStore = ViewModelStore()
     private val savedStateRegistryController = SavedStateRegistryController.create(this)
 
-    override val lifecycle: Lifecycle get() = lifecycleRegistry
-    override val viewModelStore: ViewModelStore get() = mViewModelStore
-    override val savedStateRegistry: SavedStateRegistry get() = savedStateRegistryController.savedStateRegistry
+    override val lifecycle: Lifecycle
+        get() = lifecycleRegistry
+
+    override val viewModelStore: ViewModelStore
+        get() = keyboardViewModelStore
+
+    override val savedStateRegistry: SavedStateRegistry
+        get() = savedStateRegistryController.savedStateRegistry
 
     override fun onCreate() {
         super.onCreate()
 
-        mInputMethodManager = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
-        mWordSeparators = resources.getString(R.string.word_separators)
+        wordSeparators = resources.getString(R.string.word_separators)
 
         savedStateRegistryController.performRestore(null)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
     }
 
     override fun onDestroy() {
-        super.onDestroy()
+        if (lifecycleRegistry.currentState == Lifecycle.State.RESUMED) {
+            lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
+        }
+
+        if (lifecycleRegistry.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+            lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
+        }
+
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
+        keyboardViewModelStore.clear()
+
+        super.onDestroy()
     }
 
     override fun onWindowShown() {
         super.onWindowShown()
-        lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START)
-        lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
+
+        if (lifecycleRegistry.currentState == Lifecycle.State.CREATED) {
+            lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START)
+        }
+
+        if (lifecycleRegistry.currentState == Lifecycle.State.STARTED) {
+            lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
+        }
     }
 
     override fun onWindowHidden() {
-        super.onWindowHidden()
-        lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
-    }
-
-    private val displayContext: Context
-        get() {
-            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                display?.let { createDisplayContext(it) } ?: this
-            } else {
-                @Suppress("DEPRECATION")
-                val wm = getSystemService(Context.WINDOW_SERVICE) as android.view.WindowManager
-                @Suppress("DEPRECATION")
-                createDisplayContext(wm.defaultDisplay)
-            }
+        if (lifecycleRegistry.currentState == Lifecycle.State.RESUMED) {
+            lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
         }
 
+        if (lifecycleRegistry.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+            lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
+        }
+
+        super.onWindowHidden()
+    }
+
     override fun onCreateInputView(): View {
-        // Ensure the IME window root has view tree owners for Compose.
         window?.window?.decorView?.let { decorView ->
-            decorView.setViewTreeLifecycleOwner(this@SoftKeyboard)
-            decorView.setViewTreeViewModelStoreOwner(this@SoftKeyboard)
-            decorView.setViewTreeSavedStateRegistryOwner(this@SoftKeyboard)
+            decorView.setViewTreeLifecycleOwner(this)
+            decorView.setViewTreeViewModelStoreOwner(this)
+            decorView.setViewTreeSavedStateRegistryOwner(this)
         }
 
         return ComposeView(this).apply {
@@ -110,19 +132,26 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
             setContent {
                 KeyboardScreen(
                     rows = currentLayout.value,
-                    onKeyClick = { code -> onKey(code, null) }
+                    isNumberLayout = this@SoftKeyboard.layoutMode == LayoutMode.NUMBERS,
+                    panel = currentPanel.value,
+                    suggestions = currentSuggestions.value,
+                    clipboardText = currentClipboardText.value,
+                    onKeyClick = ::onKey,
+                    onAlternativeSelected = ::onAlternativeSelected,
+                    onSuggestionClick = ::commitSuggestion,
+                    onToolbarAction = ::handleToolbarAction,
+                    onEmojiPicked = ::commitDirectText,
+                    onReactionPicked = ::commitDirectText,
+                    onClosePanel = ::showLettersPanel
                 )
             }
         }
     }
 
     /**
-     * Разрешает показывать панель ввода даже при подключённой аппаратной клавиатуре.
-     *
-     * Стандартная реализация [InputMethodService] скрывает экранную панель, если система
-     * обнаружила аппаратную клавиатуру и пользователь не включил общий параметр её
-     * одновременного показа. Для метода ввода, который пользователь выбрал явно, такое
-     * поведение выглядит как отказ запуска, поэтому панель всегда остаётся доступной.
+     * Оставляет экранную клавиатуру доступной при подключённой аппаратной клавиатуре.
+     * Это важно для явно выбранного пользователем метода ввода на эмуляторах,
+     * планшетах и устройствах с внешней клавиатурой.
      */
     override fun onEvaluateInputViewShown(): Boolean {
         super.onEvaluateInputViewShown()
@@ -130,204 +159,348 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         return true
     }
 
-    override fun onCreateCandidatesView(): View {
-        mCandidateView = CandidateView(displayContext)
-        mCandidateView?.setService(this)
-        return mCandidateView!!
-    }
-
-    override fun onStartInput(attribute: EditorInfo, restarting: Boolean) {
+    override fun onStartInput(
+        attribute: EditorInfo,
+        restarting: Boolean
+    ) {
         super.onStartInput(attribute, restarting)
 
-        mComposing.setLength(0)
-        updateCandidates()
+        composingText.clear()
+        completions = null
+        completionSuggestions = emptyList()
+        alternativeTap = null
+        predictionEnabled = false
+        completionEnabled = false
+        sensitiveInput = false
+        shiftState = ShiftState.OFF
+        lastShiftTimeMillis = 0L
+        currentPanel.value = KeyboardPanel.KEYS
+        inputClass = attribute.inputType and InputType.TYPE_MASK_CLASS
 
-        mPredictionOn = false
-        mCompletionOn = false
-        mCompletions = null
-
-        when (attribute.inputType and InputType.TYPE_MASK_CLASS) {
-            InputType.TYPE_CLASS_NUMBER, InputType.TYPE_CLASS_DATETIME, InputType.TYPE_CLASS_PHONE -> {
-                // TODO: Add digits layout to Compose
-            }
-            InputType.TYPE_CLASS_TEXT -> {
+        when (inputClass) {
+            InputType.TYPE_CLASS_NUMBER,
+            InputType.TYPE_CLASS_DATETIME,
+            InputType.TYPE_CLASS_PHONE -> {
+                layoutMode = LayoutMode.NUMBERS
                 baseLayout = KeyboardLayouts.Russian
-                layoutMode = LayoutMode.ALPHA
-                currentLayout.value = applyCaps(baseLayout, shiftState.isCapsEnabled)
-                mPredictionOn = true
-
-                val variation = attribute.inputType and InputType.TYPE_MASK_VARIATION
-                if (variation == InputType.TYPE_TEXT_VARIATION_PASSWORD ||
-                    variation == InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
-                ) {
-                    mPredictionOn = false
-                }
-
-                if (variation == InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS ||
-                    variation == InputType.TYPE_TEXT_VARIATION_URI ||
-                    variation == InputType.TYPE_TEXT_VARIATION_FILTER
-                ) {
-                    mPredictionOn = false
-                }
-
-                if ((attribute.inputType and InputType.TYPE_TEXT_FLAG_AUTO_COMPLETE) != 0) {
-                    mPredictionOn = false
-                    mCompletionOn = isFullscreenMode
-                }
+                publishLayout(KeyboardLayouts.Numbers)
             }
+
+            InputType.TYPE_CLASS_TEXT -> configureTextInput(attribute = attribute)
+
             else -> {
-                baseLayout = KeyboardLayouts.English
                 layoutMode = LayoutMode.ALPHA
-                currentLayout.value = applyCaps(baseLayout, shiftState.isCapsEnabled)
+                baseLayout = KeyboardLayouts.Russian
+                publishLayout(baseLayout)
             }
         }
+
+        refreshTextState()
+    }
+
+    override fun onStartInputView(
+        info: EditorInfo,
+        restarting: Boolean
+    ) {
+        super.onStartInputView(info, restarting)
+
+        updateAutomaticShift()
+        refreshTextState()
     }
 
     override fun onFinishInput() {
-        super.onFinishInput()
-
-        mComposing.setLength(0)
-        updateCandidates()
+        composingText.clear()
+        completionSuggestions = emptyList()
+        currentSuggestions.value = emptyList()
+        currentPanel.value = KeyboardPanel.KEYS
         setCandidatesViewShown(false)
+
+        super.onFinishInput()
     }
 
     override fun onUpdateSelection(
-        oldSelStart: Int, oldSelEnd: Int,
-        newSelStart: Int, newSelEnd: Int,
-        candidatesStart: Int, candidatesEnd: Int
+        oldSelStart: Int,
+        oldSelEnd: Int,
+        newSelStart: Int,
+        newSelEnd: Int,
+        candidatesStart: Int,
+        candidatesEnd: Int
     ) {
         super.onUpdateSelection(
-            oldSelStart, oldSelEnd, newSelStart, newSelEnd,
-            candidatesStart, candidatesEnd
+            oldSelStart,
+            oldSelEnd,
+            newSelStart,
+            newSelEnd,
+            candidatesStart,
+            candidatesEnd
         )
 
-        if (mComposing.isNotEmpty() && (newSelStart != candidatesEnd || newSelEnd != candidatesEnd)) {
-            mComposing.setLength(0)
-            updateCandidates()
+        if (
+            composingText.isNotEmpty() &&
+            (newSelStart != candidatesEnd || newSelEnd != candidatesEnd)
+        ) {
+            composingText.clear()
             currentInputConnection?.finishComposingText()
+        }
+
+        alternativeTap = null
+        updateAutomaticShift()
+        refreshTextState()
+    }
+
+    override fun onDisplayCompletions(newCompletions: Array<CompletionInfo>?) {
+        if (!completionEnabled) {
+            return
+        }
+
+        completions = newCompletions
+        completionSuggestions = newCompletions
+            ?.mapNotNull { completion ->
+                completion.text?.toString()
+            }
+            .orEmpty()
+            .take(MaxSuggestionCount)
+
+        refreshTextState()
+    }
+
+    private fun configureTextInput(attribute: EditorInfo) {
+        baseLayout = KeyboardLayouts.Russian
+        layoutMode = LayoutMode.ALPHA
+        predictionEnabled = true
+
+        val variation = attribute.inputType and InputType.TYPE_MASK_VARIATION
+        sensitiveInput = variation == InputType.TYPE_TEXT_VARIATION_PASSWORD ||
+            variation == InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD ||
+            variation == InputType.TYPE_TEXT_VARIATION_WEB_PASSWORD
+
+        if (
+            sensitiveInput ||
+            variation == InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS ||
+            variation == InputType.TYPE_TEXT_VARIATION_URI ||
+            variation == InputType.TYPE_TEXT_VARIATION_FILTER
+        ) {
+            predictionEnabled = false
+        }
+
+        if ((attribute.inputType and InputType.TYPE_TEXT_FLAG_AUTO_COMPLETE) != 0) {
+            predictionEnabled = false
+            completionEnabled = isFullscreenMode
+        }
+
+        publishLayout(baseLayout)
+    }
+
+    private fun onKey(key: KeyInfo) {
+        when {
+            isWordSeparator(code = key.code) -> {
+                alternativeTap = null
+                currentInputConnection?.let(::commitTyped)
+                sendKey(keyCode = key.code)
+                updateAutomaticShift()
+            }
+
+            key.code == KeyboardKeyCodes.DELETE -> handleBackspace()
+            key.code == KeyboardKeyCodes.SHIFT -> handleShift()
+            key.code == KeyboardKeyCodes.MODE_ALPHA -> showAlphabetLayout()
+            key.code == KeyboardKeyCodes.SYMBOLS -> showSymbolsLayout()
+            key.code == KeyboardKeyCodes.MORE_SYMBOLS -> showMoreSymbolsLayout()
+            key.code == KeyboardKeyCodes.LANGUAGE -> switchLanguage()
+            key.code == KeyboardKeyCodes.EMOJI -> currentPanel.value = KeyboardPanel.EMOJI
+            else -> handleCharacter(key = key)
+        }
+
+        refreshTextState()
+    }
+
+    private fun onAlternativeSelected(
+        key: KeyInfo,
+        alternative: String
+    ) {
+        alternativeTap = null
+
+        insertText(
+            text = alternative,
+            useComposingRegion = predictionEnabled && inputClass == InputType.TYPE_CLASS_TEXT
+        )
+
+        if (shiftState == ShiftState.ONESHOT) {
+            shiftState = ShiftState.OFF
+            publishCurrentMode()
+        }
+
+        refreshTextState()
+    }
+
+    private fun handleCharacter(key: KeyInfo) {
+        val label = key.label ?: key.code.toChar().toString()
+        val now = System.currentTimeMillis()
+        val previousTap = alternativeTap
+        val canCycleAlternative = key.alternatives.size > 1 &&
+            previousTap != null &&
+            previousTap.keyCode == key.code &&
+            now - previousTap.timestampMillis <= AlternativeTapTimeoutMillis
+
+        if (canCycleAlternative) {
+            val nextIndex = (previousTap.alternativeIndex + 1) % key.alternatives.size
+            val previousAlternative = key.alternatives[previousTap.alternativeIndex]
+            val nextAlternative = key.alternatives[nextIndex]
+
+            replaceLastInput(
+                previousText = previousAlternative,
+                replacementText = nextAlternative
+            )
+
+            alternativeTap = AlternativeTap(
+                keyCode = key.code,
+                alternativeIndex = nextIndex,
+                timestampMillis = now
+            )
+        } else {
+            insertText(
+                text = label,
+                useComposingRegion = predictionEnabled && inputClass == InputType.TYPE_CLASS_TEXT
+            )
+
+            alternativeTap = if (key.alternatives.size > 1) {
+                AlternativeTap(
+                    keyCode = key.code,
+                    alternativeIndex = key.alternatives.indexOf(label).coerceAtLeast(0),
+                    timestampMillis = now
+                )
+            } else {
+                null
+            }
+        }
+
+        if (shiftState == ShiftState.ONESHOT) {
+            shiftState = ShiftState.OFF
+            publishCurrentMode()
         }
     }
 
-    override fun onDisplayCompletions(completions: Array<CompletionInfo>?) {
-        if (mCompletionOn) {
-            mCompletions = completions
+    private fun insertText(
+        text: String,
+        useComposingRegion: Boolean
+    ) {
+        val inputConnection = currentInputConnection ?: return
 
-            if (completions == null) {
-                setSuggestions(null, completions = false, typedWordValid = false)
-                return
+        if (useComposingRegion) {
+            composingText.append(text)
+            inputConnection.setComposingText(composingText, 1)
+        } else {
+            inputConnection.commitText(text, 1)
+        }
+    }
+
+    private fun replaceLastInput(
+        previousText: String,
+        replacementText: String
+    ) {
+        val inputConnection = currentInputConnection ?: return
+
+        if (composingText.endsWith(previousText)) {
+            composingText.delete(
+                composingText.length - previousText.length,
+                composingText.length
+            )
+            composingText.append(replacementText)
+            inputConnection.setComposingText(composingText, 1)
+        } else {
+            inputConnection.deleteSurroundingTextInCodePoints(
+                previousText.codePointCount(0, previousText.length),
+                0
+            )
+            inputConnection.commitText(replacementText, 1)
+        }
+    }
+
+    private fun commitDirectText(text: String) {
+        val inputConnection = currentInputConnection ?: return
+
+        commitTyped(inputConnection = inputConnection)
+        inputConnection.commitText(text, 1)
+        alternativeTap = null
+        refreshTextState()
+    }
+
+    private fun commitSuggestion(suggestion: String) {
+        val inputConnection = currentInputConnection ?: return
+        val completionIndex = completionSuggestions.indexOf(suggestion)
+
+        if (
+            completionEnabled &&
+            completionIndex >= 0 &&
+            completions != null &&
+            completionIndex < completions!!.size
+        ) {
+            inputConnection.commitCompletion(completions!![completionIndex])
+        } else {
+            if (composingText.isNotEmpty()) {
+                composingText.clear()
+            } else {
+                val textBeforeCursor = inputConnection.getTextBeforeCursor(
+                    TextContextCharacterCount,
+                    0
+                )
+                val currentWord = SuggestionEngine.extractCurrentWord(textBeforeCursor)
+
+                if (currentWord.isNotEmpty()) {
+                    inputConnection.deleteSurroundingTextInCodePoints(
+                        currentWord.codePointCount(0, currentWord.length),
+                        0
+                    )
+                }
             }
 
-            val stringList = completions.mapNotNull { it.text?.toString() }
-            setSuggestions(stringList, completions = true, typedWordValid = true)
+            inputConnection.commitText("$suggestion ", 1)
         }
+
+        inputConnection.finishComposingText()
+        alternativeTap = null
+        updateAutomaticShift()
+        refreshTextState()
     }
 
     private fun commitTyped(inputConnection: InputConnection) {
-        if (mComposing.isNotEmpty()) {
-            inputConnection.commitText(mComposing, mComposing.length)
-            mComposing.setLength(0)
-            updateCandidates()
-        }
-    }
-
-    private fun keyDownUp(keyEventCode: Int) {
-        currentInputConnection.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyEventCode))
-        currentInputConnection.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, keyEventCode))
-    }
-
-    private fun sendKey(keyCode: Int) {
-        when (keyCode) {
-            '\n'.code -> keyDownUp(KeyEvent.KEYCODE_ENTER)
-            else -> {
-                if (keyCode >= '0'.code && keyCode <= '9'.code) {
-                    keyDownUp(keyCode - '0'.code + KeyEvent.KEYCODE_0)
-                } else {
-                    currentInputConnection.commitText(keyCode.toChar().toString(), 1)
-                }
-            }
-        }
-    }
-
-    fun onKey(primaryCode: Int, keyCodes: IntArray?) {
-        if (isWordSeparator(primaryCode)) {
-            if (mComposing.isNotEmpty()) commitTyped(currentInputConnection)
-            sendKey(primaryCode)
-        } else if (primaryCode == -5) { // KEYCODE_DELETE
-            handleBackspace()
-        } else if (primaryCode == -1) { // KEYCODE_SHIFT
-            handleShift()
-        } else if (primaryCode == -2) { // SYMBOLS / ABC / ?123
-            when (layoutMode) {
-                LayoutMode.ALPHA -> {
-                    layoutMode = LayoutMode.SYMBOLS1
-                    shiftState = ShiftState.OFF
-                    currentLayout.value = KeyboardLayouts.Symbols
-                }
-                LayoutMode.SYMBOLS1 -> {
-                    layoutMode = LayoutMode.ALPHA
-                    shiftState = ShiftState.OFF
-                    currentLayout.value = applyCaps(baseLayout, shiftState.isCapsEnabled)
-                }
-                LayoutMode.SYMBOLS2 -> {
-                    layoutMode = LayoutMode.SYMBOLS1
-                    shiftState = ShiftState.OFF
-                    currentLayout.value = KeyboardLayouts.Symbols
-                }
-            }
-        } else if (primaryCode == -4) { // MORE SYMBOLS (=\<)
-            if (layoutMode == LayoutMode.SYMBOLS1) {
-                layoutMode = LayoutMode.SYMBOLS2
-                shiftState = ShiftState.OFF
-                currentLayout.value = KeyboardLayouts.Symbols2
-            }
-        } else if (primaryCode == -6) { // 1234 placeholder
-            // Reserved for additional symbol pages.
-        } else if (primaryCode == -101) { // KEYCODE_LANGUAGE_SWITCH
-            if (baseLayout == KeyboardLayouts.Russian) {
-                baseLayout = KeyboardLayouts.English
-            } else {
-                baseLayout = KeyboardLayouts.Russian
-            }
-            if (layoutMode == LayoutMode.ALPHA) {
-                currentLayout.value = applyCaps(baseLayout, shiftState.isCapsEnabled)
-            }
-        } else {
-            handleCharacter(primaryCode, keyCodes)
-        }
-    }
-
-    private fun updateCandidates() {
-        if (!mCompletionOn) {
-            if (mComposing.isNotEmpty()) {
-                setSuggestions(listOf(mComposing.toString()), completions = true, typedWordValid = true)
-            } else {
-                setSuggestions(null, completions = false, typedWordValid = false)
-            }
-        }
-    }
-
-    fun setSuggestions(suggestions: List<String>?, completions: Boolean, typedWordValid: Boolean) {
-        if (!suggestions.isNullOrEmpty() || isExtractViewShown) {
-            setCandidatesViewShown(true)
+        if (composingText.isEmpty()) {
+            return
         }
 
-        mCandidateView?.setSuggestions(suggestions, completions, typedWordValid)
+        inputConnection.commitText(composingText, 1)
+        composingText.clear()
     }
 
     private fun handleBackspace() {
-        val length = mComposing.length
+        val inputConnection = currentInputConnection ?: return
+        alternativeTap = null
 
-        if (length > 1) {
-            mComposing.delete(length - 1, length)
-            currentInputConnection.setComposingText(mComposing, 1)
-            updateCandidates()
-        } else if (length > 0) {
-            mComposing.setLength(0)
-            currentInputConnection.commitText("", 0)
-            updateCandidates()
-        } else {
-            keyDownUp(KeyEvent.KEYCODE_DEL)
+        when {
+            composingText.isNotEmpty() -> {
+                val lastCodePointStart = composingText.offsetByCodePoints(
+                    composingText.length,
+                    -1
+                )
+                composingText.delete(lastCodePointStart, composingText.length)
+
+                if (composingText.isEmpty()) {
+                    inputConnection.finishComposingText()
+                } else {
+                    inputConnection.setComposingText(composingText, 1)
+                }
+            }
+
+            !inputConnection.getSelectedText(0).isNullOrEmpty() -> {
+                inputConnection.commitText("", 1)
+            }
+
+            else -> {
+                inputConnection.deleteSurroundingTextInCodePoints(1, 0)
+            }
         }
+
+        updateAutomaticShift()
+        refreshTextState()
     }
 
     private fun handleShift() {
@@ -335,52 +508,372 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
             return
         }
 
+        alternativeTap = null
         val now = System.currentTimeMillis()
 
         if (shiftState == ShiftState.CAPS_LOCK) {
             shiftState = ShiftState.OFF
-            mLastShiftTime = 0
-            currentLayout.value = applyCaps(baseLayout, shiftState.isCapsEnabled)
+            lastShiftTimeMillis = 0L
+            publishCurrentMode()
             return
         }
 
         shiftState = when (shiftState) {
             ShiftState.ONESHOT -> {
-                if (mLastShiftTime + 800 > now) ShiftState.CAPS_LOCK else ShiftState.OFF
+                if (lastShiftTimeMillis + ShiftDoubleTapTimeoutMillis > now) {
+                    ShiftState.CAPS_LOCK
+                } else {
+                    ShiftState.OFF
+                }
             }
 
             ShiftState.OFF -> ShiftState.ONESHOT
             ShiftState.CAPS_LOCK -> ShiftState.OFF
         }
 
-        mLastShiftTime = now
-        currentLayout.value = applyCaps(baseLayout, shiftState.isCapsEnabled)
+        lastShiftTimeMillis = now
+        publishCurrentMode()
     }
 
-    private fun handleCharacter(primaryCode: Int, keyCodes: IntArray?) {
-        var code = primaryCode
-
-        if (shiftState.isCapsEnabled) {
-            code = Character.toUpperCase(code)
+    private fun updateAutomaticShift() {
+        if (
+            layoutMode != LayoutMode.ALPHA ||
+            shiftState == ShiftState.CAPS_LOCK
+        ) {
+            return
         }
 
-        mComposing.append(code.toChar())
-        currentInputConnection.setComposingText(mComposing, 1)
-        updateCandidates()
+        val inputConnection = currentInputConnection ?: return
+        val inputType = currentInputEditorInfo?.inputType ?: InputType.TYPE_CLASS_TEXT
+        val shouldCapitalize = inputConnection.getCursorCapsMode(inputType) != 0
+        val nextState = if (shouldCapitalize) {
+            ShiftState.ONESHOT
+        } else {
+            ShiftState.OFF
+        }
 
-        if (shiftState == ShiftState.ONESHOT) {
-            shiftState = ShiftState.OFF
-            if (layoutMode == LayoutMode.ALPHA) {
-                currentLayout.value = applyCaps(baseLayout, shiftState.isCapsEnabled)
+        if (shiftState != nextState) {
+            shiftState = nextState
+            publishCurrentMode()
+        }
+    }
+
+    private fun showAlphabetLayout() {
+        layoutMode = LayoutMode.ALPHA
+        shiftState = ShiftState.OFF
+        currentPanel.value = KeyboardPanel.KEYS
+        publishLayout(baseLayout)
+        updateAutomaticShift()
+    }
+
+    private fun showSymbolsLayout() {
+        layoutMode = LayoutMode.SYMBOLS1
+        shiftState = ShiftState.OFF
+        currentPanel.value = KeyboardPanel.KEYS
+        publishLayout(KeyboardLayouts.Symbols)
+    }
+
+    private fun showMoreSymbolsLayout() {
+        if (layoutMode != LayoutMode.SYMBOLS1) {
+            return
+        }
+
+        layoutMode = LayoutMode.SYMBOLS2
+        shiftState = ShiftState.OFF
+        publishLayout(KeyboardLayouts.Symbols2)
+    }
+
+    private fun switchLanguage() {
+        baseLayout = if (baseLayout == KeyboardLayouts.Russian) {
+            KeyboardLayouts.English
+        } else {
+            KeyboardLayouts.Russian
+        }
+
+        if (layoutMode == LayoutMode.ALPHA) {
+            publishCurrentMode()
+        }
+    }
+
+    private fun publishCurrentMode() {
+        val layout = when (layoutMode) {
+            LayoutMode.ALPHA -> baseLayout
+            LayoutMode.SYMBOLS1 -> KeyboardLayouts.Symbols
+            LayoutMode.SYMBOLS2 -> KeyboardLayouts.Symbols2
+            LayoutMode.NUMBERS -> KeyboardLayouts.Numbers
+        }
+
+        publishLayout(layout)
+    }
+
+    private fun publishLayout(layout: List<List<KeyInfo>>) {
+        val withCaps = applyCaps(
+            layout = layout,
+            enabled = shiftState.isCapsEnabled
+        )
+        currentLayout.value = applyEditorAction(layout = withCaps)
+    }
+
+    private fun applyCaps(
+        layout: List<List<KeyInfo>>,
+        enabled: Boolean
+    ): List<List<KeyInfo>> {
+        return layout.map { row ->
+            row.map { key ->
+                when {
+                    key.code == KeyboardKeyCodes.SHIFT -> {
+                        key.copy(isActive = shiftState.isCapsEnabled)
+                    }
+
+                    layoutMode == LayoutMode.ALPHA &&
+                        key.label?.length == 1 &&
+                        key.code > 0 &&
+                        !key.isModifier -> {
+                        val transformedLabel = if (enabled) {
+                            key.label.uppercase(Locale.getDefault())
+                        } else {
+                            key.label.lowercase(Locale.getDefault())
+                        }
+                        val transformedAlternatives = key.alternatives.map { alternative ->
+                            if (enabled) {
+                                alternative.uppercase(Locale.getDefault())
+                            } else {
+                                alternative.lowercase(Locale.getDefault())
+                            }
+                        }
+
+                        key.copy(
+                            code = transformedLabel.first().code,
+                            label = transformedLabel,
+                            alternatives = transformedAlternatives
+                        )
+                    }
+
+                    else -> key
+                }
             }
         }
     }
 
-    @Suppress("unused")
-    private fun handleClose() {
-        commitTyped(currentInputConnection)
-        requestHideSelf(0)
+    private fun applyEditorAction(layout: List<List<KeyInfo>>): List<List<KeyInfo>> {
+        val editorInfo = currentInputEditorInfo ?: return layout
+        val action = editorInfo.imeOptions and EditorInfo.IME_MASK_ACTION
+
+        return layout.map { row ->
+            row.map { key ->
+                if (key.code != KeyboardKeyCodes.ENTER) {
+                    key
+                } else {
+                    when (action) {
+                        EditorInfo.IME_ACTION_DONE -> key.copy(
+                            label = null,
+                            icon = KeyIcon.DONE
+                        )
+
+                        EditorInfo.IME_ACTION_SEARCH -> key.copy(
+                            label = null,
+                            icon = KeyIcon.SEARCH
+                        )
+
+                        EditorInfo.IME_ACTION_SEND -> key.copy(
+                            label = null,
+                            icon = KeyIcon.SEND
+                        )
+
+                        EditorInfo.IME_ACTION_GO -> key.copy(
+                            label = "Перейти",
+                            icon = null
+                        )
+
+                        EditorInfo.IME_ACTION_NEXT -> key.copy(
+                            label = "Далее",
+                            icon = null
+                        )
+
+                        else -> key.copy(
+                            label = null,
+                            icon = KeyIcon.ENTER
+                        )
+                    }
+                }
+            }
+        }
     }
+
+    private fun sendKey(keyCode: Int) {
+        if (keyCode == KeyboardKeyCodes.ENTER) {
+            sendEditorAction()
+            return
+        }
+
+        currentInputConnection?.commitText(keyCode.toChar().toString(), 1)
+    }
+
+    private fun sendEditorAction() {
+        val inputConnection = currentInputConnection ?: return
+        val editorInfo = currentInputEditorInfo
+        val action = editorInfo?.imeOptions?.and(EditorInfo.IME_MASK_ACTION)
+            ?: EditorInfo.IME_ACTION_NONE
+        val noEnterAction = editorInfo
+            ?.imeOptions
+            ?.and(EditorInfo.IME_FLAG_NO_ENTER_ACTION) != 0
+
+        if (
+            !noEnterAction &&
+            action != EditorInfo.IME_ACTION_NONE &&
+            action != EditorInfo.IME_ACTION_UNSPECIFIED
+        ) {
+            inputConnection.performEditorAction(action)
+        } else {
+            keyDownUp(keyEventCode = KeyEvent.KEYCODE_ENTER)
+        }
+    }
+
+    private fun keyDownUp(keyEventCode: Int) {
+        val inputConnection = currentInputConnection ?: return
+
+        inputConnection.sendKeyEvent(
+            KeyEvent(
+                KeyEvent.ACTION_DOWN,
+                keyEventCode
+            )
+        )
+        inputConnection.sendKeyEvent(
+            KeyEvent(
+                KeyEvent.ACTION_UP,
+                keyEventCode
+            )
+        )
+    }
+
+    private fun refreshTextState() {
+        val inputConnection = currentInputConnection
+
+        if (inputConnection == null || sensitiveInput) {
+            currentSuggestions.value = emptyList()
+            return
+        }
+
+        val textBeforeCursor = inputConnection.getTextBeforeCursor(
+            TextContextCharacterCount,
+            0
+        )
+        val extractedText = inputConnection.getExtractedText(
+            ExtractedTextRequest(),
+            0
+        )?.text
+        val hasText = !extractedText.isNullOrEmpty() ||
+            !textBeforeCursor.isNullOrEmpty() ||
+            composingText.isNotEmpty()
+
+        currentSuggestions.value = when {
+            !hasText -> emptyList()
+            completionSuggestions.isNotEmpty() -> completionSuggestions
+            inputClass == InputType.TYPE_CLASS_TEXT -> {
+                SuggestionEngine.suggestionsFor(
+                    textBeforeCursor = textBeforeCursor,
+                    composingText = composingText
+                )
+            }
+
+            else -> {
+                val currentValue = textBeforeCursor
+                    ?.toString()
+                    ?.takeLastWhile { character ->
+                        !character.isWhitespace()
+                    }
+                    .orEmpty()
+
+                listOfNotNull(currentValue.takeIf(String::isNotBlank))
+            }
+        }
+    }
+
+    private fun handleToolbarAction(action: KeyboardToolbarAction) {
+        when (action) {
+            KeyboardToolbarAction.SWITCH_INPUT_METHOD -> switchInputMethod()
+
+            KeyboardToolbarAction.REACTIONS -> {
+                currentPanel.value = KeyboardPanel.REACTIONS
+            }
+
+            KeyboardToolbarAction.EMOJI -> {
+                currentPanel.value = KeyboardPanel.EMOJI
+            }
+
+            KeyboardToolbarAction.CLIPBOARD -> {
+                refreshClipboardText()
+                currentPanel.value = KeyboardPanel.CLIPBOARD
+            }
+
+            KeyboardToolbarAction.SETTINGS -> openInputMethodSettings()
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun switchInputMethod() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            switchToNextInputMethod(false)
+            return
+        }
+
+        val inputMethodManager = getSystemService(
+            Context.INPUT_METHOD_SERVICE
+        ) as InputMethodManager
+        val windowToken = window?.window?.attributes?.token
+
+        inputMethodManager.switchToNextInputMethod(windowToken, false)
+    }
+
+    private fun refreshClipboardText() {
+        val clipboardManager = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val primaryClip = clipboardManager.primaryClip
+
+        currentClipboardText.value = if (
+            primaryClip != null &&
+            primaryClip.itemCount > 0
+        ) {
+            primaryClip
+                .getItemAt(0)
+                .coerceToText(this)
+                ?.toString()
+                ?.take(MaxClipboardCharacterCount)
+        } else {
+            null
+        }
+    }
+
+    private fun openInputMethodSettings() {
+        /*
+         * Настройки открываются отдельной задачей, потому что метод ввода является
+         * службой и не располагает собственным Activity-контекстом.
+         */
+        val intent = Intent(Settings.ACTION_INPUT_METHOD_SETTINGS).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+
+        startActivity(intent)
+    }
+
+    private fun showLettersPanel() {
+        currentPanel.value = KeyboardPanel.KEYS
+    }
+
+    private fun isWordSeparator(code: Int): Boolean {
+        return code > 0 && wordSeparators.contains(code.toChar())
+    }
+
+    fun pickSuggestionManually(index: Int) {
+        currentSuggestions.value
+            .getOrNull(index)
+            ?.let(::commitSuggestion)
+    }
+
+    private data class AlternativeTap(
+        val keyCode: Int,
+        val alternativeIndex: Int,
+        val timestampMillis: Long
+    )
 
     private enum class ShiftState {
         OFF,
@@ -394,55 +887,15 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
     private enum class LayoutMode {
         ALPHA,
         SYMBOLS1,
-        SYMBOLS2
+        SYMBOLS2,
+        NUMBERS
     }
 
-    private fun isWordSeparator(code: Int): Boolean {
-        return mWordSeparators?.contains(code.toChar()) == true
-    }
-
-    private fun applyCaps(
-        layout: List<List<KeyInfo>>,
-        enabled: Boolean
-    ): List<List<KeyInfo>> {
-        if (layoutMode != LayoutMode.ALPHA) {
-            return layout
-        }
-
-        if (!enabled) {
-            return layout.map { row ->
-                row.map { key ->
-                    if (key.label?.length == 1 && key.code > 0 && !key.isModifier) {
-                        val lower = key.label.lowercase(Locale.getDefault())
-                        val lowerCode = lower[0].code
-                        key.copy(label = lower, code = lowerCode)
-                    } else {
-                        key
-                    }
-                }
-            }
-        }
-
-        return layout.map { row ->
-            row.map { key ->
-                if (key.label?.length == 1 && key.code > 0 && !key.isModifier) {
-                    val upper = key.label.uppercase(Locale.getDefault())
-                    val upperCode = upper[0].code
-                    key.copy(label = upper, code = upperCode)
-                } else {
-                    key
-                }
-            }
-        }
-    }
-
-    fun pickSuggestionManually(index: Int) {
-        if (mCompletionOn && mCompletions != null && index >= 0 && index < mCompletions!!.size) {
-            val ci = mCompletions!![index]
-            currentInputConnection.commitCompletion(ci)
-            mCandidateView?.clear()
-        } else if (mComposing.isNotEmpty()) {
-            commitTyped(currentInputConnection)
-        }
+    private companion object {
+        const val MaxSuggestionCount = 3
+        const val TextContextCharacterCount = 128
+        const val MaxClipboardCharacterCount = 10_000
+        const val AlternativeTapTimeoutMillis = 500L
+        const val ShiftDoubleTapTimeoutMillis = 800L
     }
 }

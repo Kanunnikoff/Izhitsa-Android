@@ -1,114 +1,282 @@
 package software.kanunnikoff.izhitsa.compose
 
-import software.kanunnikoff.izhitsa.R
+object KeyboardKeyCodes {
+    const val SHIFT = -1
+    const val MODE_ALPHA = -2
+    const val MORE_SYMBOLS = -4
+    const val DELETE = -5
+    const val SYMBOLS = -6
+    const val LANGUAGE = -101
+    const val EMOJI = -102
+    const val ENTER = 10
+    const val SPACE = 32
+}
+
+enum class KeyIcon {
+    BACKSPACE,
+    DONE,
+    EMOJI,
+    ENTER,
+    LANGUAGE,
+    SEARCH,
+    SEND,
+    SHIFT
+}
 
 object KeyboardLayouts {
     val Symbols = listOf(
         listOf(
-            KeyInfo(49, "1"), KeyInfo(50, "2"), KeyInfo(51, "3"), KeyInfo(52, "4"),
-            KeyInfo(53, "5"), KeyInfo(54, "6"), KeyInfo(55, "7"), KeyInfo(56, "8"),
-            KeyInfo(57, "9"), KeyInfo(48, "0")
+            key("1"), key("2"), key("3"), key("4"), key("5"),
+            key("6"), key("7"), key("8"), key("9"), key("0")
         ),
         listOf(
-            KeyInfo(64, "@"), KeyInfo(35, "#"), KeyInfo(36, "$"), KeyInfo(95, "_"),
-            KeyInfo(38, "&"), KeyInfo(45, "-"), KeyInfo(43, "+"), KeyInfo(40, "("),
-            KeyInfo(41, ")"), KeyInfo(47, "/")
+            key("@"), key("#"), key("₽"), key("_"), key("&"),
+            key("-"), key("+"), key("("), key(")"), key("/")
         ),
         listOf(
-            KeyInfo(-4, "=\\" , weight = 1.5f, isModifier = true),
-            KeyInfo(42, "*"), KeyInfo(34, "\""), KeyInfo(39, "'"), KeyInfo(58, ":"),
-            KeyInfo(59, ";"), KeyInfo(33, "!"), KeyInfo(63, "?"),
-            KeyInfo(-5, iconResId = R.drawable.ic_outline_backspace_24px, weight = 1.5f, isModifier = true)
+            special(KeyboardKeyCodes.MORE_SYMBOLS, "=\\", weight = 1.5f),
+            key("*"), key("\""), key("'"), key(":"), key(";"), key("!"), key("?"),
+            iconKey(KeyboardKeyCodes.DELETE, KeyIcon.BACKSPACE, weight = 1.5f)
         ),
         listOf(
-            KeyInfo(-2, "ABC", weight = 1.5f, isModifier = true),
-            KeyInfo(44, ","),
-            KeyInfo(-6, "1234", weight = 1.2f, isModifier = true),
-            KeyInfo(32, " ", weight = 4f),
-            KeyInfo(46, "."),
-            KeyInfo(10, iconResId = R.drawable.ic_outline_keyboard_return_24px, weight = 1.5f, isModifier = true)
+            special(KeyboardKeyCodes.MODE_ALPHA, "АБВ", weight = 1.5f),
+            key(","),
+            special(KeyboardKeyCodes.EMOJI, icon = KeyIcon.EMOJI, weight = 1.1f),
+            KeyInfo(
+                code = KeyboardKeyCodes.SPACE,
+                label = "Русский",
+                weight = 4f
+            ),
+            key("."),
+            enterKey()
         )
     )
 
     val Symbols2 = listOf(
         listOf(
-            KeyInfo(126, "~"), KeyInfo(96, "`"), KeyInfo(124, "|"), KeyInfo(8226, "•"),
-            KeyInfo(8730, "√"), KeyInfo(960, "π"), KeyInfo(247, "÷"), KeyInfo(215, "×"),
-            KeyInfo(167, "§"), KeyInfo(916, "Δ")
+            key("~"), key("`"), key("|"), key("•"), key("√"),
+            key("π"), key("÷"), key("×"), key("§"), key("Δ")
         ),
         listOf(
-            KeyInfo(163, "£"), KeyInfo(162, "¢"), KeyInfo(8364, "€"), KeyInfo(165, "¥"),
-            KeyInfo(94, "^"), KeyInfo(176, "°"), KeyInfo(61, "="), KeyInfo(123, "{"),
-            KeyInfo(125, "}"), KeyInfo(92, "\\")
+            key("£"), key("€"), key("$"), key("¢"), key("^"),
+            key("°"), key("="), key("{"), key("}"), key("\\")
         ),
         listOf(
-            KeyInfo(-2, "?123", weight = 1.5f, isModifier = true),
-            KeyInfo(37, "%"), KeyInfo(169, "©"), KeyInfo(174, "®"), KeyInfo(8482, "™"),
-            KeyInfo(10003, "✓"), KeyInfo(91, "["), KeyInfo(93, "]"),
-            KeyInfo(-5, iconResId = R.drawable.ic_outline_backspace_24px, weight = 1.5f, isModifier = true)
+            special(KeyboardKeyCodes.SYMBOLS, "?123", weight = 1.5f),
+            key("%"), key("©"), key("®"), key("™"), key("✓"), key("["), key("]"),
+            iconKey(KeyboardKeyCodes.DELETE, KeyIcon.BACKSPACE, weight = 1.5f)
         ),
         listOf(
-            KeyInfo(-2, "ABC", weight = 1.5f, isModifier = true),
-            KeyInfo(60, "<"),
-            KeyInfo(-6, "1234", weight = 1.2f, isModifier = true),
-            KeyInfo(32, " ", weight = 4f),
-            KeyInfo(62, ">"),
-            KeyInfo(10, iconResId = R.drawable.ic_outline_keyboard_return_24px, weight = 1.5f, isModifier = true)
+            special(KeyboardKeyCodes.MODE_ALPHA, "АБВ", weight = 1.5f),
+            key("<"),
+            special(KeyboardKeyCodes.EMOJI, icon = KeyIcon.EMOJI, weight = 1.1f),
+            KeyInfo(
+                code = KeyboardKeyCodes.SPACE,
+                label = "Русский",
+                weight = 4f
+            ),
+            key(">"),
+            enterKey()
         )
     )
 
     val Russian = listOf(
         listOf(
-            KeyInfo(1081, "й"), KeyInfo(1094, "ц"), KeyInfo(1091, "у"), KeyInfo(1082, "к"),
-            KeyInfo(1077, "е"), KeyInfo(1085, "н"), KeyInfo(1075, "г"), KeyInfo(1096, "ш"),
-            KeyInfo(1097, "щ"), KeyInfo(1079, "з"), KeyInfo(1093, "х")
+            key("й", hint = "1"),
+            key("ц", hint = "2"),
+            key("у", hint = "3"),
+            key("к", hint = "4"),
+            key(
+                label = "е",
+                hint = "5",
+                alternatives = listOf("е", "ѣ", "ё")
+            ),
+            key("н", hint = "6"),
+            key("г", hint = "7"),
+            key("ш", hint = "8"),
+            key("щ", hint = "9"),
+            key("з", hint = "0"),
+            key("х")
         ),
         listOf(
-            KeyInfo(1092, "ф"), KeyInfo(1099, "ы"), KeyInfo(1074, "в"), KeyInfo(1072, "а"),
-            KeyInfo(1087, "п"), KeyInfo(1088, "р"), KeyInfo(1086, "о"), KeyInfo(1083, "л"),
-            KeyInfo(1076, "д"), KeyInfo(1078, "ж"), KeyInfo(1101, "э")
+            key(
+                label = "ф",
+                alternatives = listOf("ф", "ѳ")
+            ),
+            key("ы"), key("в"), key("а"), key("п"), key("р"),
+            key("о"), key("л"), key("д"), key("ж"), key("э")
         ),
         listOf(
-            KeyInfo(-1, iconResId = R.drawable.ic_baseline_forward_24px, weight = 1.5f, isModifier = true),
-            KeyInfo(1103, "я"), KeyInfo(1095, "ч"), KeyInfo(1089, "с"), KeyInfo(1084, "м"),
-            KeyInfo(1080, "и"), KeyInfo(1090, "т"), KeyInfo(1100, "ь"), KeyInfo(1073, "б"),
-            KeyInfo(1102, "ю"),
-            KeyInfo(-5, iconResId = R.drawable.ic_outline_backspace_24px, weight = 1.5f, isModifier = true)
+            iconKey(KeyboardKeyCodes.SHIFT, KeyIcon.SHIFT, weight = 1.5f),
+            key("я"), key("ч"), key("с"), key("м"),
+            key(
+                label = "и",
+                alternatives = listOf("и", "i", "ѵ")
+            ),
+            key("т"),
+            key(
+                label = "ь",
+                alternatives = listOf("ь", "ъ")
+            ),
+            key("б"), key("ю"),
+            iconKey(KeyboardKeyCodes.DELETE, KeyIcon.BACKSPACE, weight = 1.5f)
         ),
-        listOf(
-            KeyInfo(-2, "?123", weight = 1.5f, isModifier = true),
-            KeyInfo(44, ","),
-            KeyInfo(-101, iconResId = R.drawable.ic_baseline_language_24px),
-            KeyInfo(32, "Русскiй", weight = 4f),
-            KeyInfo(46, "."),
-            KeyInfo(10, iconResId = R.drawable.ic_outline_keyboard_return_24px, weight = 1.5f, isModifier = true)
-        )
+        alphabetBottomRow(language = "Русский")
     )
 
     val English = listOf(
         listOf(
-            KeyInfo(113, "q"), KeyInfo(119, "w"), KeyInfo(101, "e"), KeyInfo(114, "r"),
-            KeyInfo(116, "t"), KeyInfo(121, "y"), KeyInfo(117, "u"), KeyInfo(105, "i"),
-            KeyInfo(111, "o"), KeyInfo(112, "p")
+            key("q", hint = "1"),
+            key("w", hint = "2"),
+            key(
+                label = "e",
+                hint = "3",
+                alternatives = listOf("e", "é", "è", "ê", "ë")
+            ),
+            key("r", hint = "4"),
+            key("t", hint = "5"),
+            key("y", hint = "6"),
+            key(
+                label = "u",
+                hint = "7",
+                alternatives = listOf("u", "ú", "ù", "û", "ü")
+            ),
+            key(
+                label = "i",
+                hint = "8",
+                alternatives = listOf("i", "í", "ì", "î", "ï")
+            ),
+            key(
+                label = "o",
+                hint = "9",
+                alternatives = listOf("o", "ó", "ò", "ô", "ö")
+            ),
+            key("p", hint = "0")
         ),
         listOf(
-            KeyInfo(97, "a"), KeyInfo(115, "s"), KeyInfo(100, "d"), KeyInfo(102, "f"),
-            KeyInfo(103, "g"), KeyInfo(104, "h"), KeyInfo(106, "j"), KeyInfo(107, "k"),
-            KeyInfo(108, "l")
+            key(
+                label = "a",
+                alternatives = listOf("a", "á", "à", "â", "ä")
+            ),
+            key("s"), key("d"), key("f"), key("g"), key("h"),
+            key("j"), key("k"), key("l")
         ),
         listOf(
-            KeyInfo(-1, iconResId = R.drawable.ic_baseline_forward_24px, weight = 1.5f, isModifier = true),
-            KeyInfo(122, "z"), KeyInfo(120, "x"), KeyInfo(99, "c"), KeyInfo(118, "v"),
-            KeyInfo(98, "b"), KeyInfo(110, "n"), KeyInfo(109, "m"),
-            KeyInfo(-5, iconResId = R.drawable.ic_outline_backspace_24px, weight = 1.5f, isModifier = true)
+            iconKey(KeyboardKeyCodes.SHIFT, KeyIcon.SHIFT, weight = 1.5f),
+            key("z"), key("x"),
+            key(
+                label = "c",
+                alternatives = listOf("c", "ç")
+            ),
+            key("v"), key("b"),
+            key(
+                label = "n",
+                alternatives = listOf("n", "ñ")
+            ),
+            key("m"),
+            iconKey(KeyboardKeyCodes.DELETE, KeyIcon.BACKSPACE, weight = 1.5f)
+        ),
+        alphabetBottomRow(language = "English")
+    )
+
+    val Numbers = listOf(
+        listOf(
+            key("+", weight = 0.8f),
+            key("1", weight = 1.25f),
+            key("2", weight = 1.25f),
+            key("3", weight = 1.25f),
+            special(code = "%".first().code, label = "%", weight = 0.8f)
         ),
         listOf(
-            KeyInfo(-2, "?123", weight = 1.5f, isModifier = true),
-            KeyInfo(44, ","),
-            KeyInfo(-101, iconResId = R.drawable.ic_baseline_language_24px),
-            KeyInfo(32, "English", weight = 4f),
-            KeyInfo(46, "."),
-            KeyInfo(10, iconResId = R.drawable.ic_outline_keyboard_return_24px, weight = 1.5f, isModifier = true)
+            key("-", weight = 0.8f),
+            key("4", weight = 1.25f),
+            key("5", weight = 1.25f),
+            key("6", weight = 1.25f),
+            special(code = KeyboardKeyCodes.SPACE, label = "␣", weight = 0.8f)
+        ),
+        listOf(
+            key("*", weight = 0.8f),
+            key("7", weight = 1.25f),
+            key("8", weight = 1.25f),
+            key("9", weight = 1.25f),
+            iconKey(KeyboardKeyCodes.DELETE, KeyIcon.BACKSPACE, weight = 0.8f)
+        ),
+        listOf(
+            key("/", weight = 0.8f),
+            special(KeyboardKeyCodes.MODE_ALPHA, "АБВ", weight = 1.1f),
+            key(",", weight = 0.72f),
+            special(KeyboardKeyCodes.SYMBOLS, "!?#"),
+            key("0", weight = 1.8f),
+            key("=", weight = 0.95f),
+            key(".", weight = 0.72f),
+            enterKey(weight = 1.1f)
         )
     )
+
+    private fun alphabetBottomRow(language: String): List<KeyInfo> {
+        return listOf(
+            special(KeyboardKeyCodes.SYMBOLS, "?123", weight = 1.5f),
+            key(",", weight = 0.9f),
+            special(KeyboardKeyCodes.EMOJI, icon = KeyIcon.EMOJI, weight = 0.9f),
+            special(KeyboardKeyCodes.LANGUAGE, icon = KeyIcon.LANGUAGE, weight = 0.9f),
+            KeyInfo(
+                code = KeyboardKeyCodes.SPACE,
+                label = language,
+                weight = 4f
+            ),
+            key(".", weight = 0.9f),
+            enterKey()
+        )
+    }
+
+    private fun key(
+        label: String,
+        hint: String? = null,
+        alternatives: List<String> = emptyList(),
+        weight: Float = 1f
+    ): KeyInfo {
+        return KeyInfo(
+            code = label.first().code,
+            label = label,
+            hint = hint,
+            alternatives = alternatives,
+            weight = weight
+        )
+    }
+
+    private fun special(
+        code: Int,
+        label: String? = null,
+        icon: KeyIcon? = null,
+        weight: Float = 1f
+    ): KeyInfo {
+        return KeyInfo(
+            code = code,
+            label = label,
+            icon = icon,
+            weight = weight,
+            isModifier = true
+        )
+    }
+
+    private fun iconKey(
+        code: Int,
+        icon: KeyIcon,
+        weight: Float
+    ): KeyInfo {
+        return special(
+            code = code,
+            icon = icon,
+            weight = weight
+        )
+    }
+
+    private fun enterKey(weight: Float = 1.5f): KeyInfo {
+        return KeyInfo(
+            code = KeyboardKeyCodes.ENTER,
+            icon = KeyIcon.ENTER,
+            weight = weight,
+            isModifier = true
+        )
+    }
 }

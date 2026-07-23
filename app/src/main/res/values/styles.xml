@@ -30,4 +30,22 @@
         <item name="subtitleTextColor">@android:color/white</item>
     </style>
 
+    <style name="KeyboardEmojiPickerLight" parent="Theme.MaterialComponents.Light.NoActionBar">
+        <item name="android:colorBackground">#F7F7FF</item>
+        <item name="colorSurface">#F7F7FF</item>
+        <item name="colorPrimary">#0B57D0</item>
+        <item name="colorControlNormal">#5F6368</item>
+        <item name="android:textColorPrimary">#202124</item>
+        <item name="android:fontFamily">sans</item>
+    </style>
+
+    <style name="KeyboardEmojiPickerDark" parent="Theme.MaterialComponents.NoActionBar">
+        <item name="android:colorBackground">#202124</item>
+        <item name="colorSurface">#202124</item>
+        <item name="colorPrimary">#A8C7FA</item>
+        <item name="colorControlNormal">#BDC1C6</item>
+        <item name="android:textColorPrimary">#F1F3F4</item>
+        <item name="android:fontFamily">sans</item>
+    </style>
+
 </resources>

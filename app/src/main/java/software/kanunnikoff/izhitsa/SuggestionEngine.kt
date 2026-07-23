@@ -1,0 +1,101 @@
+package software.kanunnikoff.izhitsa
+
+import java.util.Locale
+
+internal object SuggestionEngine {
+    fun suggestionsFor(
+        textBeforeCursor: CharSequence?,
+        composingText: CharSequence?
+    ): List<String> {
+        val currentWord = composingText
+            ?.toString()
+            ?.takeIf(String::isNotBlank)
+            ?: extractCurrentWord(textBeforeCursor)
+
+        if (currentWord.isBlank()) {
+            return NextWordSuggestions
+        }
+
+        val normalizedWord = currentWord.lowercase(RussianLocale)
+        val suggestions = linkedSetOf(currentWord)
+
+        RussianLexicon
+            .asSequence()
+            .filter { candidate ->
+                candidate.lowercase(RussianLocale).startsWith(normalizedWord)
+            }
+            .forEach { candidate ->
+                suggestions += candidate
+            }
+
+        if (suggestions.size < SuggestionCount) {
+            suggestions += currentWord.replaceFirstChar { character ->
+                character.titlecase(RussianLocale)
+            }
+        }
+
+        NextWordSuggestions.forEach { suggestion ->
+            if (suggestions.size < SuggestionCount) {
+                suggestions += suggestion
+            }
+        }
+
+        return suggestions.take(SuggestionCount)
+    }
+
+    fun extractCurrentWord(textBeforeCursor: CharSequence?): String {
+        return textBeforeCursor
+            ?.toString()
+            ?.takeLastWhile { character ->
+                character.isLetter() || character == '\'' || character == '’'
+            }
+            .orEmpty()
+    }
+
+    private const val SuggestionCount = 3
+
+    private val RussianLocale = Locale.forLanguageTag("ru-RU")
+
+    private val NextWordSuggestions = listOf("и", "в", "на")
+
+    /*
+     * Небольшой встроенный словарь служит надёжным запасным вариантом, когда
+     * приложение-получатель не передаёт собственные варианты автодополнения.
+     * Первым всегда остаётся введённое пользователем слово.
+     */
+    private val RussianLexicon = listOf(
+        "благодарю",
+        "больше",
+        "будет",
+        "быть",
+        "вас",
+        "всего",
+        "где",
+        "да",
+        "для",
+        "доброе",
+        "есть",
+        "ещё",
+        "здравствуйте",
+        "как",
+        "карп",
+        "карпов",
+        "Карпаты",
+        "когда",
+        "который",
+        "можно",
+        "мы",
+        "написать",
+        "нет",
+        "нужно",
+        "пожалуйста",
+        "почему",
+        "привет",
+        "спасибо",
+        "так",
+        "текст",
+        "хорошо",
+        "чтобы",
+        "это"
+    )
+}
