@@ -12,8 +12,8 @@ android {
         applicationId = "software.kanunnikoff.izhitsa"
         minSdk = 26
         targetSdk = 37
-        versionCode = 5
-        versionName = "1.1.3"
+        versionCode = 12
+        versionName = "3.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -33,6 +33,10 @@ android {
     buildFeatures {
         compose = true
     }
+
+    androidResources {
+        noCompress += "bin"
+    }
 }
 
 dependencies {
@@ -43,6 +47,7 @@ dependencies {
     implementation(libs.androidx.constraintlayout)
     implementation(libs.google.material)
     implementation(libs.billing.client)
+    implementation(libs.play.review)
 
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.ui)

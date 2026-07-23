@@ -5,7 +5,8 @@ import java.util.Locale
 internal object SuggestionEngine {
     fun suggestionsFor(
         textBeforeCursor: CharSequence?,
-        composingText: CharSequence?
+        composingText: CharSequence?,
+        dictionary: SuggestionDictionary? = null
     ): List<String> {
         val currentWord = composingText
             ?.toString()
@@ -19,9 +20,21 @@ internal object SuggestionEngine {
         val normalizedWord = currentWord.lowercase(RussianLocale)
         val suggestions = linkedSetOf(currentWord)
 
+        dictionary
+            ?.suggestions(
+                prefix = normalizedWord,
+                limit = SuggestionCount
+            )
+            ?.forEach { candidate ->
+                if (!candidate.equals(currentWord, ignoreCase = false)) {
+                    suggestions += candidate
+                }
+            }
+
         RussianLexicon
             .asSequence()
             .filter { candidate ->
+                suggestions.size < SuggestionCount &&
                 candidate.lowercase(RussianLocale).startsWith(normalizedWord)
             }
             .forEach { candidate ->

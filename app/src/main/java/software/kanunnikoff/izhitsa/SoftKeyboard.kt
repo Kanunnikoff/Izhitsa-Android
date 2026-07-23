@@ -34,9 +34,13 @@ import software.kanunnikoff.izhitsa.compose.KeyboardLayouts
 import software.kanunnikoff.izhitsa.compose.KeyboardPanel
 import software.kanunnikoff.izhitsa.compose.KeyboardScreen
 import software.kanunnikoff.izhitsa.compose.KeyboardToolbarAction
+import software.kanunnikoff.izhitsa.stickers.Sticker
+import software.kanunnikoff.izhitsa.stickers.StickerContentSender
+import software.kanunnikoff.izhitsa.stickers.StickerRepository
 import java.util.Locale
 
 class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, SavedStateRegistryOwner {
+    private lateinit var russianDictionary: RussianDictionary
     private val composingText = StringBuilder()
     private var completions: Array<CompletionInfo>? = null
     private var completionSuggestions: List<String> = emptyList()
@@ -44,6 +48,7 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
     private var completionEnabled = false
     private var sensitiveInput = false
     private var inputClass = InputType.TYPE_CLASS_TEXT
+    private var supportsStickerContent = false
     private var shiftState = ShiftState.OFF
     private var lastShiftTimeMillis = 0L
     private var alternativeTap: AlternativeTap? = null
@@ -53,6 +58,7 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
     private val currentPanel = mutableStateOf(KeyboardPanel.KEYS)
     private val currentSuggestions = mutableStateOf<List<String>>(emptyList())
     private val currentClipboardText = mutableStateOf<String?>(null)
+    private lateinit var stickerContentSender: StickerContentSender
 
     private var baseLayout: List<List<KeyInfo>> = KeyboardLayouts.Russian
     private var layoutMode = LayoutMode.ALPHA
@@ -74,6 +80,11 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         super.onCreate()
 
         wordSeparators = resources.getString(R.string.word_separators)
+        russianDictionary = RussianDictionary(context = applicationContext)
+        russianDictionary.prepare()
+        stickerContentSender = StickerContentSender(
+            repository = StickerRepository(context = applicationContext)
+        )
 
         savedStateRegistryController.performRestore(null)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
@@ -136,12 +147,14 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
                     panel = currentPanel.value,
                     suggestions = currentSuggestions.value,
                     clipboardText = currentClipboardText.value,
+                    supportsStickerContent = supportsStickerContent,
                     onKeyClick = ::onKey,
                     onAlternativeSelected = ::onAlternativeSelected,
                     onSuggestionClick = ::commitSuggestion,
                     onToolbarAction = ::handleToolbarAction,
                     onEmojiPicked = ::commitDirectText,
                     onReactionPicked = ::commitDirectText,
+                    onStickerPicked = ::commitSticker,
                     onClosePanel = ::showLettersPanel
                 )
             }
@@ -176,6 +189,9 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         lastShiftTimeMillis = 0L
         currentPanel.value = KeyboardPanel.KEYS
         inputClass = attribute.inputType and InputType.TYPE_MASK_CLASS
+        supportsStickerContent = stickerContentSender.isSupported(
+            editorInfo = attribute
+        )
 
         when (inputClass) {
             InputType.TYPE_CLASS_NUMBER,
@@ -204,6 +220,7 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
     ) {
         super.onStartInputView(info, restarting)
 
+        AppPreferences(context = applicationContext).hasUsedKeyboard = true
         updateAutomaticShift()
         refreshTextState()
     }
@@ -422,6 +439,20 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         inputConnection.commitText(text, 1)
         alternativeTap = null
         refreshTextState()
+    }
+
+    private fun commitSticker(sticker: Sticker) {
+        if (!supportsStickerContent) {
+            return
+        }
+
+        val inputConnection = currentInputConnection ?: return
+
+        commitTyped(inputConnection = inputConnection)
+        stickerContentSender.commit(
+            inputConnection = inputConnection,
+            sticker = sticker
+        )
     }
 
     private fun commitSuggestion(suggestion: String) {
@@ -772,7 +803,8 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
             inputClass == InputType.TYPE_CLASS_TEXT -> {
                 SuggestionEngine.suggestionsFor(
                     textBeforeCursor = textBeforeCursor,
-                    composingText = composingText
+                    composingText = composingText,
+                    dictionary = russianDictionary
                 )
             }
 
@@ -793,8 +825,8 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         when (action) {
             KeyboardToolbarAction.SWITCH_INPUT_METHOD -> switchInputMethod()
 
-            KeyboardToolbarAction.REACTIONS -> {
-                currentPanel.value = KeyboardPanel.REACTIONS
+            KeyboardToolbarAction.STICKERS -> {
+                currentPanel.value = KeyboardPanel.STICKERS
             }
 
             KeyboardToolbarAction.EMOJI -> {

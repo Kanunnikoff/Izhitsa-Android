@@ -4,6 +4,7 @@ import android.view.ContextThemeWrapper
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -26,6 +27,9 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
@@ -35,6 +39,7 @@ import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.ContentPaste
+import androidx.compose.material.icons.rounded.Collections
 import androidx.compose.material.icons.rounded.Done
 import androidx.compose.material.icons.rounded.EmojiEmotions
 import androidx.compose.material.icons.rounded.Face
@@ -63,6 +68,7 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -76,6 +82,8 @@ import androidx.emoji2.emojipicker.EmojiPickerView
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import software.kanunnikoff.izhitsa.R
+import software.kanunnikoff.izhitsa.stickers.Sticker
+import software.kanunnikoff.izhitsa.stickers.StickerCatalog
 import kotlin.math.roundToInt
 import androidx.emoji2.emojipicker.R as EmojiPickerResources
 
@@ -93,13 +101,13 @@ data class KeyInfo(
 enum class KeyboardPanel {
     KEYS,
     EMOJI,
-    REACTIONS,
+    STICKERS,
     CLIPBOARD
 }
 
 enum class KeyboardToolbarAction {
     SWITCH_INPUT_METHOD,
-    REACTIONS,
+    STICKERS,
     EMOJI,
     CLIPBOARD,
     SETTINGS
@@ -112,12 +120,14 @@ fun KeyboardScreen(
     panel: KeyboardPanel,
     suggestions: List<String>,
     clipboardText: String?,
+    supportsStickerContent: Boolean,
     onKeyClick: (KeyInfo) -> Unit,
     onAlternativeSelected: (KeyInfo, String) -> Unit,
     onSuggestionClick: (String) -> Unit,
     onToolbarAction: (KeyboardToolbarAction) -> Unit,
     onEmojiPicked: (String) -> Unit,
     onReactionPicked: (String) -> Unit,
+    onStickerPicked: (Sticker) -> Unit,
     onClosePanel: () -> Unit
 ) {
     val isDark = isSystemInDarkTheme()
@@ -181,16 +191,17 @@ fun KeyboardScreen(
                 )
             }
 
-            KeyboardPanel.REACTIONS -> {
+            KeyboardPanel.STICKERS -> {
                 PanelToolbar(
-                    title = "Быстрые реакции",
+                    title = "Стикеры",
                     palette = palette,
                     onBack = onClosePanel
                 )
 
-                ReactionsPanel(
+                StickersPanel(
                     palette = palette,
-                    onReactionPicked = onReactionPicked
+                    supportsStickerContent = supportsStickerContent,
+                    onStickerPicked = onStickerPicked
                 )
 
                 PanelNavigation(
@@ -289,10 +300,10 @@ private fun KeyboardToolbar(
             Spacer(modifier = Modifier.weight(1f))
 
             ToolbarIcon(
-                imageVector = Icons.Rounded.Face,
-                contentDescription = "Быстрые реакции",
+                imageVector = Icons.Rounded.Collections,
+                contentDescription = "Стикеры",
                 palette = palette,
-                onClick = { onToolbarAction(KeyboardToolbarAction.REACTIONS) }
+                onClick = { onToolbarAction(KeyboardToolbarAction.STICKERS) }
             )
 
             ToolbarIcon(
@@ -801,46 +812,62 @@ private fun EmojiPanel(
 }
 
 @Composable
-private fun ReactionsPanel(
+private fun StickersPanel(
     palette: KeyboardPalette,
-    onReactionPicked: (String) -> Unit
+    supportsStickerContent: Boolean,
+    onStickerPicked: (Sticker) -> Unit
 ) {
-    Column(
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(StickerColumnCount),
         modifier = Modifier
             .fillMaxWidth()
-            .height(PanelBodyHeight)
+            .height(StickerPanelBodyHeight)
             .padding(
                 horizontal = KeyboardHorizontalPadding,
                 vertical = KeyboardVerticalPadding
             ),
+        horizontalArrangement = Arrangement.spacedBy(KeyGap),
         verticalArrangement = Arrangement.spacedBy(KeyGap)
     ) {
-        QuickReactions.chunked(ReactionColumnCount).forEach { row ->
-            Row(
+        if (!supportsStickerContent) {
+            item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+                Text(
+                    text = "Это поле не принимает изображения",
+                    color = palette.textSecondary,
+                    fontSize = 13.sp,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 6.dp)
+                )
+            }
+        }
+
+        items(
+            items = StickerCatalog.items,
+            key = Sticker::identifier
+        ) { sticker ->
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(KeyGap)
+                    .height(StickerItemHeight)
+                    .clip(shape = RoundedCornerShape(size = KeyCornerRadius))
+                    .background(color = palette.key)
+                    .combinedClickable(
+                        enabled = supportsStickerContent,
+                        onClick = {
+                            onStickerPicked(sticker)
+                        },
+                        onLongClick = {}
+                    )
+                    .padding(4.dp),
+                contentAlignment = Alignment.Center
             ) {
-                row.forEach { reaction ->
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            .clip(shape = RoundedCornerShape(size = KeyCornerRadius))
-                            .background(color = palette.key)
-                            .combinedClickable(
-                                onClick = { onReactionPicked(reaction) },
-                                onLongClick = {}
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = reaction,
-                            fontSize = 27.sp
-                        )
-                    }
-                }
+                Image(
+                    painter = painterResource(sticker.drawableResource),
+                    contentDescription = sticker.description,
+                    modifier = Modifier.fillMaxSize()
+                )
             }
         }
     }
@@ -1023,15 +1050,10 @@ private fun keyboardPalette(isDark: Boolean): KeyboardPalette {
     }
 }
 
-private val QuickReactions = listOf(
-    "👍", "❤️", "😂", "👏", "🎉", "🔥",
-    "🙏", "🤔", "😮", "😢", "😍", "💡"
-)
-
 private const val MaxSuggestionCount = 3
 private const val EmojiColumnCount = 9
 private const val FirstEmojiCategoryPosition = 2
-private const val ReactionColumnCount = 6
+private const val StickerColumnCount = 2
 private const val PressAnimationDurationMillis = 70
 private const val PressedKeyScale = 0.96f
 
@@ -1043,6 +1065,8 @@ private val KeyboardHorizontalPadding = 6.dp
 private val KeyboardVerticalPadding = 6.dp
 private val PanelBodyHeight = 160.dp
 private val EmojiPanelBodyHeight = 270.dp
+private val StickerPanelBodyHeight = 270.dp
+private val StickerItemHeight = 122.dp
 private val PanelNavigationHeight = 49.dp
 private val NumberGridHeight = KeyHeight * 3 + KeyGap * 2
 private const val NumberSideColumnWeight = 0.85f

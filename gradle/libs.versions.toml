@@ -9,6 +9,7 @@ androidxCoreKtx = "1.19.0"
 androidxConstraintlayout = "2.2.1"
 material = "1.14.0"
 billing = "9.1.0"
+playReview = "2.0.2"
 firebaseBom = "34.16.0"
 
 androidxComposeBom = "2026.06.01"
@@ -28,6 +29,7 @@ androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = 
 androidx-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "androidxConstraintlayout" }
 google-material = { group = "com.google.android.material", name = "material", version.ref = "material" }
 billing-client = { group = "com.android.billingclient", name = "billing", version.ref = "billing" }
+play-review = { group = "com.google.android.play", name = "review-ktx", version.ref = "playReview" }
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
 firebase-analytics = { group = "com.google.firebase", name = "firebase-analytics" }
 firebase-crashlytics = { group = "com.google.firebase", name = "firebase-crashlytics" }

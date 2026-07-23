@@ -148,6 +148,26 @@ class BillingManager(private val mActivity: Activity, private val mBillingUpdate
             return
         }
 
+        if (purchase.purchaseState != Purchase.PurchaseState.PURCHASED) {
+            Log.i(TAG, "Purchase is not completed yet: $purchase")
+            return
+        }
+
+        if (!purchase.isAcknowledged) {
+            val acknowledgeParams = AcknowledgePurchaseParams.newBuilder()
+                .setPurchaseToken(purchase.purchaseToken)
+                .build()
+
+            mBillingClient?.acknowledgePurchase(acknowledgeParams) { billingResult ->
+                if (billingResult.responseCode != BillingClient.BillingResponseCode.OK) {
+                    Log.w(
+                        TAG,
+                        "Failed to acknowledge purchase: ${billingResult.debugMessage}"
+                    )
+                }
+            }
+        }
+
         Log.d(TAG, "Got a verified purchase: $purchase")
         mPurchases.add(purchase)
     }
