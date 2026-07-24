@@ -10,12 +10,20 @@ import java.util.Locale
 
 class SuggestionEngineTest {
     private val russianLocale = Locale.forLanguageTag("ru-RU")
+    private val testDictionary = SuggestionDictionary { prefix, limit ->
+        listOf("карп", "карпов", "Карпаты")
+            .filter { word ->
+                word.lowercase(russianLocale).startsWith(prefix)
+            }
+            .take(limit)
+    }
 
     @Test
-    fun suggestionsKeepTypedWordFirstAndCompleteKnownPrefix() {
+    fun suggestionsMatchDictionaryOrderForKnownPrefix() {
         val suggestions = SuggestionEngine.suggestionsFor(
             textBeforeCursor = "карп",
-            composingText = "карп"
+            composingText = "карп",
+            dictionary = testDictionary
         )
 
         assertEquals(
@@ -25,27 +33,28 @@ class SuggestionEngineTest {
     }
 
     @Test
-    fun suggestionsOfferNextWordsAfterSeparator() {
+    fun suggestionsAreEmptyAfterSeparator() {
         val suggestions = SuggestionEngine.suggestionsFor(
             textBeforeCursor = "готово ",
             composingText = ""
         )
 
         assertEquals(
-            listOf("и", "в", "на"),
+            emptyList<String>(),
             suggestions
         )
     }
 
     @Test
-    fun unknownWordStillProducesThreeToolbarItems() {
+    fun unknownWordDoesNotProduceArtificialSuggestions() {
         val suggestions = SuggestionEngine.suggestionsFor(
             textBeforeCursor = "karp",
-            composingText = null
+            composingText = null,
+            dictionary = testDictionary
         )
 
         assertEquals(
-            listOf("karp", "Karp", "и"),
+            emptyList<String>(),
             suggestions
         )
     }
@@ -107,7 +116,8 @@ class SuggestionEngineTest {
     fun oneShotShiftCapitalizesSuggestionInitials() {
         val suggestions = SuggestionEngine.suggestionsFor(
             textBeforeCursor = "карп",
-            composingText = "карп"
+            composingText = "карп",
+            dictionary = testDictionary
         ).withSuggestionLetterCase(
             letterCase = SuggestionLetterCase.INITIAL_UPPERCASE,
             currentWord = "карп",
@@ -124,7 +134,8 @@ class SuggestionEngineTest {
     fun capsLockUppercasesEntireSuggestions() {
         val suggestions = SuggestionEngine.suggestionsFor(
             textBeforeCursor = "карп",
-            composingText = "карп"
+            composingText = "карп",
+            dictionary = testDictionary
         ).withSuggestionLetterCase(
             letterCase = SuggestionLetterCase.UPPERCASE,
             currentWord = "карп",
@@ -142,7 +153,8 @@ class SuggestionEngineTest {
         val currentWord = "Карп"
         val suggestions = SuggestionEngine.suggestionsFor(
             textBeforeCursor = currentWord,
-            composingText = currentWord
+            composingText = currentWord,
+            dictionary = testDictionary
         ).withSuggestionLetterCase(
             letterCase = SuggestionLetterCase.UNCHANGED,
             currentWord = currentWord,

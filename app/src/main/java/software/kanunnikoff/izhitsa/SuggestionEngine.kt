@@ -14,47 +14,18 @@ internal object SuggestionEngine {
         )
 
         if (currentWord.isBlank()) {
-            return NextWordSuggestions
+            return emptyList()
         }
 
         val normalizedWord = currentWord.lowercase(RussianLocale)
-        val suggestions = linkedSetOf(currentWord)
 
-        dictionary
+        return dictionary
             ?.suggestions(
                 prefix = normalizedWord,
                 limit = SuggestionCount
             )
-            ?.forEach { candidate ->
-                if (!candidate.equals(currentWord, ignoreCase = true)) {
-                    suggestions += candidate
-                }
-            }
-
-        RussianLexicon
-            .asSequence()
-            .filter { candidate ->
-                suggestions.size < SuggestionCount &&
-                    candidate.lowercase(RussianLocale).startsWith(normalizedWord) &&
-                    !candidate.equals(currentWord, ignoreCase = true)
-            }
-            .forEach { candidate ->
-                suggestions += candidate
-            }
-
-        if (suggestions.size < SuggestionCount) {
-            suggestions += currentWord.replaceFirstChar { character ->
-                character.titlecase(RussianLocale)
-            }
-        }
-
-        NextWordSuggestions.forEach { suggestion ->
-            if (suggestions.size < SuggestionCount) {
-                suggestions += suggestion
-            }
-        }
-
-        return suggestions.take(SuggestionCount)
+            .orEmpty()
+            .take(SuggestionCount)
     }
 
     fun resolveCurrentWord(
@@ -79,49 +50,6 @@ internal object SuggestionEngine {
     private const val SuggestionCount = 3
 
     private val RussianLocale = Locale.forLanguageTag("ru-RU")
-
-    private val NextWordSuggestions = listOf("и", "в", "на")
-
-    /*
-     * Небольшой встроенный словарь служит надёжным запасным вариантом, когда
-     * приложение-получатель не передаёт собственные варианты автодополнения.
-     * Первым всегда остаётся введённое пользователем слово.
-     */
-    private val RussianLexicon = listOf(
-        "благодарю",
-        "больше",
-        "будет",
-        "быть",
-        "вас",
-        "всего",
-        "где",
-        "да",
-        "для",
-        "доброе",
-        "есть",
-        "ещё",
-        "здравствуйте",
-        "как",
-        "карп",
-        "карпов",
-        "Карпаты",
-        "когда",
-        "который",
-        "можно",
-        "мы",
-        "написать",
-        "нет",
-        "нужно",
-        "пожалуйста",
-        "почему",
-        "привет",
-        "спасибо",
-        "так",
-        "текст",
-        "хорошо",
-        "чтобы",
-        "это"
-    )
 }
 
 internal fun List<String>.withSuggestionLetterCase(

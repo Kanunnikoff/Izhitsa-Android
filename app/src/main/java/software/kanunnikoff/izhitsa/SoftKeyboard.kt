@@ -399,7 +399,11 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
 
         insertText(
             text = alternative,
-            useComposingRegion = predictionEnabled && inputClass == InputType.TYPE_CLASS_TEXT
+            useComposingRegion = shouldUseComposingRegion(
+                sdkInt = Build.VERSION.SDK_INT,
+                predictionEnabled = predictionEnabled,
+                inputClass = inputClass
+            )
         )
 
         if (shiftState == ShiftState.ONESHOT) {
@@ -437,7 +441,11 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         } else {
             insertText(
                 text = label,
-                useComposingRegion = predictionEnabled && inputClass == InputType.TYPE_CLASS_TEXT
+                useComposingRegion = shouldUseComposingRegion(
+                    sdkInt = Build.VERSION.SDK_INT,
+                    predictionEnabled = predictionEnabled,
+                    inputClass = inputClass
+                )
             )
 
             alternativeTap = if (key.tapAlternatives.size > 1) {
@@ -465,7 +473,14 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
 
         if (useComposingRegion) {
             composingText.append(text)
-            inputConnection.setComposingText(composingText, 1)
+
+            /*
+             * InputConnection принимает CharSequence, но конкретный редактор может
+             * обработать его после возвращения из вызова. Передаём неизменяемый
+             * снимок, чтобы последующее изменение общего буфера не меняло уже
+             * отправленное состояние составного текста.
+             */
+            inputConnection.setComposingText(composingText.toString(), 1)
         } else {
             inputConnection.commitText(text, 1)
         }
@@ -483,7 +498,7 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
                 composingText.length
             )
             composingText.append(replacementText)
-            inputConnection.setComposingText(composingText, 1)
+            inputConnection.setComposingText(composingText.toString(), 1)
         } else {
             inputConnection.deleteSurroundingTextInCodePoints(
                 previousText.codePointCount(0, previousText.length),
@@ -574,7 +589,7 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
             return
         }
 
-        inputConnection.commitText(composingText, 1)
+        inputConnection.commitText(composingText.toString(), 1)
         composingText.clear()
     }
 
@@ -594,7 +609,7 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
                 if (composingText.isEmpty()) {
                     inputConnection.finishComposingText()
                 } else {
-                    inputConnection.setComposingText(composingText, 1)
+                    inputConnection.setComposingText(composingText.toString(), 1)
                 }
 
                 true
@@ -1107,6 +1122,22 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         const val KeyVibrationAmplitude = 85
         const val KeyVibrationScale = 0.33f
     }
+}
+
+internal fun shouldUseComposingRegion(
+    sdkInt: Int,
+    predictionEnabled: Boolean,
+    inputClass: Int
+): Boolean {
+    /*
+     * На Android 9 и старше поле Compose может завершить составную область,
+     * не уведомив метод ввода. Следующий разделитель тогда повторно вставляет
+     * уже отображённое слово. На этих версиях закрепляем каждый символ сразу;
+     * начиная с Android 10 сохраняем обычное составное выделение слова.
+     */
+    return sdkInt >= Build.VERSION_CODES.Q &&
+        predictionEnabled &&
+        inputClass == InputType.TYPE_CLASS_TEXT
 }
 
 internal fun createShareApplicationIntent(packageName: String): Intent {
