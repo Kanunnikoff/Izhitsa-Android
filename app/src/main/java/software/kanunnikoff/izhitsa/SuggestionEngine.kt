@@ -8,10 +8,10 @@ internal object SuggestionEngine {
         composingText: CharSequence?,
         dictionary: SuggestionDictionary? = null
     ): List<String> {
-        val currentWord = composingText
-            ?.toString()
-            ?.takeIf(String::isNotBlank)
-            ?: extractCurrentWord(textBeforeCursor)
+        val currentWord = resolveCurrentWord(
+            textBeforeCursor = textBeforeCursor,
+            composingText = composingText
+        )
 
         if (currentWord.isBlank()) {
             return NextWordSuggestions
@@ -26,7 +26,7 @@ internal object SuggestionEngine {
                 limit = SuggestionCount
             )
             ?.forEach { candidate ->
-                if (!candidate.equals(currentWord, ignoreCase = false)) {
+                if (!candidate.equals(currentWord, ignoreCase = true)) {
                     suggestions += candidate
                 }
             }
@@ -35,7 +35,8 @@ internal object SuggestionEngine {
             .asSequence()
             .filter { candidate ->
                 suggestions.size < SuggestionCount &&
-                candidate.lowercase(RussianLocale).startsWith(normalizedWord)
+                    candidate.lowercase(RussianLocale).startsWith(normalizedWord) &&
+                    !candidate.equals(currentWord, ignoreCase = true)
             }
             .forEach { candidate ->
                 suggestions += candidate
@@ -54,6 +55,16 @@ internal object SuggestionEngine {
         }
 
         return suggestions.take(SuggestionCount)
+    }
+
+    fun resolveCurrentWord(
+        textBeforeCursor: CharSequence?,
+        composingText: CharSequence?
+    ): String {
+        return composingText
+            ?.toString()
+            ?.takeIf(String::isNotBlank)
+            ?: extractCurrentWord(textBeforeCursor)
     }
 
     fun extractCurrentWord(textBeforeCursor: CharSequence?): String {
@@ -111,4 +122,44 @@ internal object SuggestionEngine {
         "чтобы",
         "это"
     )
+}
+
+internal fun List<String>.withSuggestionLetterCase(
+    letterCase: SuggestionLetterCase,
+    currentWord: CharSequence?,
+    locale: Locale
+): List<String> {
+    /*
+     * Одноразовый Shift выключается сразу после первой буквы. Если введённое
+     * слово уже начинается с заглавной, сохраняем этот регистр у всех вариантов,
+     * даже когда текущее состояние Shift успело вернуться в обычное.
+     */
+    val effectiveLetterCase = when {
+        letterCase != SuggestionLetterCase.UNCHANGED -> letterCase
+        currentWord?.firstOrNull()?.isUpperCase() == true -> {
+            SuggestionLetterCase.INITIAL_UPPERCASE
+        }
+
+        else -> SuggestionLetterCase.UNCHANGED
+    }
+
+    return map { suggestion ->
+        when (effectiveLetterCase) {
+            SuggestionLetterCase.UNCHANGED -> suggestion
+
+            SuggestionLetterCase.INITIAL_UPPERCASE -> {
+                suggestion.replaceFirstChar { character ->
+                    character.uppercase(locale)
+                }
+            }
+
+            SuggestionLetterCase.UPPERCASE -> suggestion.uppercase(locale)
+        }
+    }
+}
+
+internal enum class SuggestionLetterCase {
+    UNCHANGED,
+    INITIAL_UPPERCASE,
+    UPPERCASE
 }

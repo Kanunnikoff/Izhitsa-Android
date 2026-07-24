@@ -6,8 +6,11 @@ import org.junit.Test
 import java.io.File
 import java.io.FileInputStream
 import java.nio.channels.FileChannel
+import java.util.Locale
 
 class SuggestionEngineTest {
+    private val russianLocale = Locale.forLanguageTag("ru-RU")
+
     @Test
     fun suggestionsKeepTypedWordFirstAndCompleteKnownPrefix() {
         val suggestions = SuggestionEngine.suggestionsFor(
@@ -96,6 +99,58 @@ class SuggestionEngineTest {
 
         assertEquals(
             listOf("карп", "карпа", "карпами"),
+            suggestions
+        )
+    }
+
+    @Test
+    fun oneShotShiftCapitalizesSuggestionInitials() {
+        val suggestions = SuggestionEngine.suggestionsFor(
+            textBeforeCursor = "карп",
+            composingText = "карп"
+        ).withSuggestionLetterCase(
+            letterCase = SuggestionLetterCase.INITIAL_UPPERCASE,
+            currentWord = "карп",
+            locale = russianLocale
+        )
+
+        assertEquals(
+            listOf("Карп", "Карпов", "Карпаты"),
+            suggestions
+        )
+    }
+
+    @Test
+    fun capsLockUppercasesEntireSuggestions() {
+        val suggestions = SuggestionEngine.suggestionsFor(
+            textBeforeCursor = "карп",
+            composingText = "карп"
+        ).withSuggestionLetterCase(
+            letterCase = SuggestionLetterCase.UPPERCASE,
+            currentWord = "карп",
+            locale = russianLocale
+        )
+
+        assertEquals(
+            listOf("КАРП", "КАРПОВ", "КАРПАТЫ"),
+            suggestions
+        )
+    }
+
+    @Test
+    fun typedInitialUppercaseIsPreservedAfterOneShotShiftTurnsOff() {
+        val currentWord = "Карп"
+        val suggestions = SuggestionEngine.suggestionsFor(
+            textBeforeCursor = currentWord,
+            composingText = currentWord
+        ).withSuggestionLetterCase(
+            letterCase = SuggestionLetterCase.UNCHANGED,
+            currentWord = currentWord,
+            locale = russianLocale
+        )
+
+        assertEquals(
+            listOf("Карп", "Карпов", "Карпаты"),
             suggestions
         )
     }

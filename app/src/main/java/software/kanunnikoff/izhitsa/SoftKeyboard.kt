@@ -520,17 +520,28 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
 
     private fun commitSuggestion(suggestion: String) {
         val inputConnection = currentInputConnection ?: return
-        val completionIndex = completionSuggestions.indexOf(suggestion)
+        val completionIndex = currentSuggestions.value.indexOf(suggestion)
+        val completion = completions?.getOrNull(completionIndex)
 
         performKeyFeedback()
 
         if (
             completionEnabled &&
-            completionIndex >= 0 &&
-            completions != null &&
-            completionIndex < completions!!.size
+            completion != null
         ) {
-            inputConnection.commitCompletion(completions!![completionIndex])
+            /*
+             * Приложение передаёт CompletionInfo до преобразования регистра. Создаём
+             * равнозначный вариант с отображаемым текстом, сохраняя его идентификатор
+             * и положение, чтобы выбранное слово вставлялось именно в показанном виде.
+             */
+            inputConnection.commitCompletion(
+                CompletionInfo(
+                    completion.id,
+                    completion.position,
+                    suggestion,
+                    completion.label
+                )
+            )
         } else {
             if (composingText.isNotEmpty()) {
                 composingText.clear()
@@ -887,8 +898,12 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         val hasText = !extractedText.isNullOrEmpty() ||
             !textBeforeCursor.isNullOrEmpty() ||
             composingText.isNotEmpty()
+        val currentWord = SuggestionEngine.resolveCurrentWord(
+            textBeforeCursor = textBeforeCursor,
+            composingText = composingText
+        )
 
-        currentSuggestions.value = when {
+        val suggestions = when {
             !hasText -> emptyList()
             completionSuggestions.isNotEmpty() -> completionSuggestions
             inputClass == InputType.TYPE_CLASS_TEXT -> {
@@ -910,6 +925,12 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
                 listOfNotNull(currentValue.takeIf(String::isNotBlank))
             }
         }
+
+        currentSuggestions.value = suggestions.withSuggestionLetterCase(
+            letterCase = shiftState.suggestionLetterCase,
+            currentWord = currentWord,
+            locale = Locale.getDefault()
+        )
     }
 
     private fun handleToolbarAction(action: KeyboardToolbarAction) {
@@ -999,21 +1020,41 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
             return
         }
 
+        vibrator.vibrate(createKeyVibrationEffect())
+    }
+
+    private fun createKeyVibrationEffect(): VibrationEffect {
         /*
-         * На Android 10 и новее используем короткий системный эффект: устройство
-         * само подбирает подходящую силу для своего вибромотора. На Android 8 и 9
-         * воспроизводим короткий одиночный импульс с системной амплитудой.
+         * На Android 11 и новее композиция позволяет масштабировать системный
+         * короткий эффект без потери его чёткости. На остальных устройствах
+         * уменьшаем амплитуду, а при отсутствии аппаратного управления ею —
+         * длительность импульса. Все три варианта дают примерно треть прежней силы.
          */
-        val vibrationEffect = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK)
-        } else {
+        if (
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+            vibrator.areAllPrimitivesSupported(
+                VibrationEffect.Composition.PRIMITIVE_TICK
+            )
+        ) {
+            return VibrationEffect.startComposition()
+                .addPrimitive(
+                    VibrationEffect.Composition.PRIMITIVE_TICK,
+                    KeyVibrationScale
+                )
+                .compose()
+        }
+
+        return if (vibrator.hasAmplitudeControl()) {
             VibrationEffect.createOneShot(
                 KeyVibrationDurationMillis,
+                KeyVibrationAmplitude
+            )
+        } else {
+            VibrationEffect.createOneShot(
+                KeyVibrationFallbackDurationMillis,
                 VibrationEffect.DEFAULT_AMPLITUDE
             )
         }
-
-        vibrator.vibrate(vibrationEffect)
     }
 
     private fun isWordSeparator(code: Int): Boolean {
@@ -1039,6 +1080,13 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
 
         val isCapsEnabled: Boolean
             get() = this != OFF
+
+        val suggestionLetterCase: SuggestionLetterCase
+            get() = when (this) {
+                OFF -> SuggestionLetterCase.UNCHANGED
+                ONESHOT -> SuggestionLetterCase.INITIAL_UPPERCASE
+                CAPS_LOCK -> SuggestionLetterCase.UPPERCASE
+            }
     }
 
     private enum class LayoutMode {
@@ -1055,6 +1103,9 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         const val AlternativeTapTimeoutMillis = 500L
         const val ShiftDoubleTapTimeoutMillis = 800L
         const val KeyVibrationDurationMillis = 10L
+        const val KeyVibrationFallbackDurationMillis = 3L
+        const val KeyVibrationAmplitude = 85
+        const val KeyVibrationScale = 0.33f
     }
 }
 
