@@ -24,7 +24,6 @@
         <item name="titleTextColor">@android:color/white</item>
         <item name="android:textColorSecondary">@android:color/white</item>
         <item name="android:textSize">25sp</item>
-        <item name="android:fontFamily">@font/monomakh_unicode</item>
         <item name="android:color">@android:color/white</item>
         <item name="android:textColorPrimary">@android:color/white</item>
         <item name="subtitleTextColor">@android:color/white</item>

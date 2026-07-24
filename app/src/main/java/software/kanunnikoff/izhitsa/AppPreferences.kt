@@ -9,19 +9,27 @@ class AppPreferences(context: Context) {
         Context.MODE_PRIVATE
     )
 
-    var usesSystemFont: Boolean
-        get() = preferences.getBoolean(SystemFontKey, true)
-        set(value) {
-            preferences.edit {
-                putBoolean(SystemFontKey, value)
-            }
-        }
-
     var usesPreRevolutionaryOrthography: Boolean
         get() = preferences.getBoolean(PreRevolutionaryOrthographyKey, false)
         set(value) {
             preferences.edit {
                 putBoolean(PreRevolutionaryOrthographyKey, value)
+            }
+        }
+
+    var isKeyboardSoundFeedbackEnabled: Boolean
+        get() = preferences.getBoolean(KeyboardSoundFeedbackKey, false)
+        set(value) {
+            preferences.edit {
+                putBoolean(KeyboardSoundFeedbackKey, value)
+            }
+        }
+
+    var isKeyboardHapticFeedbackEnabled: Boolean
+        get() = preferences.getBoolean(KeyboardHapticFeedbackKey, false)
+        set(value) {
+            preferences.edit {
+                putBoolean(KeyboardHapticFeedbackKey, value)
             }
         }
 
@@ -51,8 +59,9 @@ class AppPreferences(context: Context) {
 
     companion object {
         private const val PreferencesFileName = "izhitsa_settings"
-        private const val SystemFontKey = "app_uses_system_font"
         private const val PreRevolutionaryOrthographyKey = "app_uses_pre_revolutionary_orthography"
+        private const val KeyboardSoundFeedbackKey = "keyboard_sound_feedback_enabled"
+        private const val KeyboardHapticFeedbackKey = "keyboard_haptic_feedback_enabled"
         private const val HasUsedKeyboardKey = "keyboard_has_been_used"
         private const val LaunchesCountKey = "launches_count"
         private const val LastReviewVersionKey = "last_review_version"

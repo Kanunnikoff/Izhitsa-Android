@@ -82,8 +82,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.Font
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -92,18 +90,25 @@ import software.kanunnikoff.izhitsa.R
 
 @Composable
 fun IzhitsaApplication(
-    initialUsesSystemFont: Boolean,
     initialUsesPreRevolutionaryOrthography: Boolean,
+    initialIsKeyboardSoundFeedbackEnabled: Boolean,
+    initialIsKeyboardHapticFeedbackEnabled: Boolean,
     hasUsedKeyboard: Boolean,
     versionName: String,
     versionCode: Long,
-    onUsesSystemFontChanged: (Boolean) -> Unit,
     onUsesPreRevolutionaryOrthographyChanged: (Boolean) -> Unit,
+    onKeyboardSoundFeedbackChanged: (Boolean) -> Unit,
+    onKeyboardHapticFeedbackChanged: (Boolean) -> Unit,
     onSupportAuthor: () -> Unit
 ) {
-    var usesSystemFont by remember { mutableStateOf(initialUsesSystemFont) }
     var usesPreRevolutionaryOrthography by remember {
         mutableStateOf(initialUsesPreRevolutionaryOrthography)
+    }
+    var isKeyboardSoundFeedbackEnabled by remember {
+        mutableStateOf(initialIsKeyboardSoundFeedbackEnabled)
+    }
+    var isKeyboardHapticFeedbackEnabled by remember {
+        mutableStateOf(initialIsKeyboardHapticFeedbackEnabled)
     }
     val context = LocalContext.current
     val isDark = isSystemInDarkTheme()
@@ -118,49 +123,28 @@ fun IzhitsaApplication(
     } else {
         lightColorScheme()
     }
-    val appFontFamily = if (usesSystemFont) {
-        FontFamily.Default
-    } else {
-        FontFamily(Font(R.font.monomakh_unicode))
-    }
-    val typography = MaterialTheme.typography.run {
-        copy(
-            displayLarge = displayLarge.copy(fontFamily = appFontFamily),
-            displayMedium = displayMedium.copy(fontFamily = appFontFamily),
-            displaySmall = displaySmall.copy(fontFamily = appFontFamily),
-            headlineLarge = headlineLarge.copy(fontFamily = appFontFamily),
-            headlineMedium = headlineMedium.copy(fontFamily = appFontFamily),
-            headlineSmall = headlineSmall.copy(fontFamily = appFontFamily),
-            titleLarge = titleLarge.copy(fontFamily = appFontFamily),
-            titleMedium = titleMedium.copy(fontFamily = appFontFamily),
-            titleSmall = titleSmall.copy(fontFamily = appFontFamily),
-            bodyLarge = bodyLarge.copy(fontFamily = appFontFamily),
-            bodyMedium = bodyMedium.copy(fontFamily = appFontFamily),
-            bodySmall = bodySmall.copy(fontFamily = appFontFamily),
-            labelLarge = labelLarge.copy(fontFamily = appFontFamily),
-            labelMedium = labelMedium.copy(fontFamily = appFontFamily),
-            labelSmall = labelSmall.copy(fontFamily = appFontFamily)
-        )
-    }
-
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = typography
-    ) {
+    MaterialTheme(colorScheme = colorScheme) {
         AppNavigation(
-            usesSystemFont = usesSystemFont,
             usesPreRevolutionaryOrthography =
                 usesPreRevolutionaryOrthography,
+            isKeyboardSoundFeedbackEnabled =
+                isKeyboardSoundFeedbackEnabled,
+            isKeyboardHapticFeedbackEnabled =
+                isKeyboardHapticFeedbackEnabled,
             hasUsedKeyboard = hasUsedKeyboard,
             versionName = versionName,
             versionCode = versionCode,
-            onUsesSystemFontChanged = { value ->
-                usesSystemFont = value
-                onUsesSystemFontChanged(value)
-            },
             onUsesPreRevolutionaryOrthographyChanged = { value ->
                 usesPreRevolutionaryOrthography = value
                 onUsesPreRevolutionaryOrthographyChanged(value)
+            },
+            onKeyboardSoundFeedbackChanged = { value ->
+                isKeyboardSoundFeedbackEnabled = value
+                onKeyboardSoundFeedbackChanged(value)
+            },
+            onKeyboardHapticFeedbackChanged = { value ->
+                isKeyboardHapticFeedbackEnabled = value
+                onKeyboardHapticFeedbackChanged(value)
             },
             onSupportAuthor = onSupportAuthor
         )
@@ -179,13 +163,15 @@ private enum class AppSection(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AppNavigation(
-    usesSystemFont: Boolean,
     usesPreRevolutionaryOrthography: Boolean,
+    isKeyboardSoundFeedbackEnabled: Boolean,
+    isKeyboardHapticFeedbackEnabled: Boolean,
     hasUsedKeyboard: Boolean,
     versionName: String,
     versionCode: Long,
-    onUsesSystemFontChanged: (Boolean) -> Unit,
     onUsesPreRevolutionaryOrthographyChanged: (Boolean) -> Unit,
+    onKeyboardSoundFeedbackChanged: (Boolean) -> Unit,
+    onKeyboardHapticFeedbackChanged: (Boolean) -> Unit,
     onSupportAuthor: () -> Unit
 ) {
     var selectedSection by remember { mutableStateOf(AppSection.HOME) }
@@ -319,13 +305,18 @@ private fun AppNavigation(
                     )
 
                     AppSection.SETTINGS -> SettingsScreen(
-                        usesSystemFont = usesSystemFont,
                         usesPreRevolutionaryOrthography =
                             usesPreRevolutionaryOrthography,
-                        onUsesSystemFontChanged =
-                            onUsesSystemFontChanged,
+                        isKeyboardSoundFeedbackEnabled =
+                            isKeyboardSoundFeedbackEnabled,
+                        isKeyboardHapticFeedbackEnabled =
+                            isKeyboardHapticFeedbackEnabled,
                         onUsesPreRevolutionaryOrthographyChanged =
-                            onUsesPreRevolutionaryOrthographyChanged
+                            onUsesPreRevolutionaryOrthographyChanged,
+                        onKeyboardSoundFeedbackChanged =
+                            onKeyboardSoundFeedbackChanged,
+                        onKeyboardHapticFeedbackChanged =
+                            onKeyboardHapticFeedbackChanged
                     )
 
                     AppSection.ABOUT -> AboutScreen(
@@ -615,7 +606,7 @@ private fun AlphabetScreen(
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     text = if (usesPreRevolutionaryOrthography) {
-                        "Дореформенная русская азбука"
+                        "Дореформенный русскій алфавитъ"
                     } else {
                         "Дореформенный русский алфавит"
                     },
@@ -623,7 +614,11 @@ private fun AlphabetScreen(
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
-                    text = "Прописные и строчные формы 35 букв, входивших в русскую азбуку до реформы 1918 года.",
+                    text = if (usesPreRevolutionaryOrthography) {
+                        "Прописныя и строчныя формы 35 буквъ, входившихъ въ русскій алфавитъ до реформы 1918 года."
+                    } else {
+                        "Прописные и строчные формы 35 букв, входивших в русский алфавит до реформы 1918 года."
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -659,7 +654,11 @@ private fun AlphabetScreen(
 
         item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
             Text(
-                text = "Четыре упразднённые буквы — І, Ѣ, Ѳ и Ѵ. Буквы Ё и Й формально не входили в азбуку, но употреблялись в письме.",
+                text = if (usesPreRevolutionaryOrthography) {
+                    "Четыре упразднённыя буквы — І, Ѣ, Ѳ и Ѵ. Буквы Ё и Й формально не входили въ алфавитъ, но употреблялись въ письмѣ."
+                } else {
+                    "Четыре упразднённые буквы — І, Ѣ, Ѳ и Ѵ. Буквы Ё и Й формально не входили в алфавит, но употреблялись в письме."
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -682,7 +681,11 @@ private fun AlphabetScreen(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Источник: «Русская дореформенная орфография»",
+                    text = if (usesPreRevolutionaryOrthography) {
+                        "Источникъ: «Русская дореформенная орѳографія»"
+                    } else {
+                        "Источник: «Русская дореформенная орфография»"
+                    },
                     color = MaterialTheme.colorScheme.primary
                 )
             }
@@ -692,10 +695,12 @@ private fun AlphabetScreen(
 
 @Composable
 private fun SettingsScreen(
-    usesSystemFont: Boolean,
     usesPreRevolutionaryOrthography: Boolean,
-    onUsesSystemFontChanged: (Boolean) -> Unit,
-    onUsesPreRevolutionaryOrthographyChanged: (Boolean) -> Unit
+    isKeyboardSoundFeedbackEnabled: Boolean,
+    isKeyboardHapticFeedbackEnabled: Boolean,
+    onUsesPreRevolutionaryOrthographyChanged: (Boolean) -> Unit,
+    onKeyboardSoundFeedbackChanged: (Boolean) -> Unit,
+    onKeyboardHapticFeedbackChanged: (Boolean) -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -727,20 +732,6 @@ private fun SettingsScreen(
         ) {
             SettingsToggle(
                 title = if (usesPreRevolutionaryOrthography) {
-                    "Системный шрифтъ и размѣръ"
-                } else {
-                    "Системный шрифт и размер"
-                },
-                checked = usesSystemFont,
-                onCheckedChange = onUsesSystemFontChanged
-            )
-
-            HorizontalDivider(
-                modifier = Modifier.padding(start = ListTextPadding)
-            )
-
-            SettingsToggle(
-                title = if (usesPreRevolutionaryOrthography) {
                     "Дореволюціонная орѳографія"
                 } else {
                     "Дореволюционная орфография"
@@ -753,9 +744,71 @@ private fun SettingsScreen(
 
         Text(
             text = if (usesPreRevolutionaryOrthography) {
-                "Возможность отображенія текста въ старинномъ начертаніи и орѳографіи до реформы 1918-го года."
+                "Отображеніе текста въ орѳографіи, употреблявшейся до реформы 1918 года."
             } else {
-                "Возможность отображения текста в старинном начертании и орфографии до реформы 1918-го года."
+                "Отображение текста в орфографии, употреблявшейся до реформы 1918 года."
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(
+                horizontal = ListTextPadding,
+                vertical = 10.dp
+            )
+        )
+
+        Spacer(modifier = Modifier.height(SectionSpacing))
+
+        Text(
+            text = if (usesPreRevolutionaryOrthography) {
+                "Клавіатура"
+            } else {
+                "Клавиатура"
+            },
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(
+                start = ListTextPadding,
+                bottom = 4.dp
+            )
+        )
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(SettingsSectionCornerRadius),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
+            )
+        ) {
+            SettingsToggle(
+                title = if (usesPreRevolutionaryOrthography) {
+                    "Звуковой откликъ"
+                } else {
+                    "Звуковой отклик"
+                },
+                checked = isKeyboardSoundFeedbackEnabled,
+                onCheckedChange = onKeyboardSoundFeedbackChanged
+            )
+
+            HorizontalDivider(
+                modifier = Modifier.padding(start = ListTextPadding)
+            )
+
+            SettingsToggle(
+                title = if (usesPreRevolutionaryOrthography) {
+                    "Виброоткликъ"
+                } else {
+                    "Виброотклик"
+                },
+                checked = isKeyboardHapticFeedbackEnabled,
+                onCheckedChange = onKeyboardHapticFeedbackChanged
+            )
+        }
+
+        Text(
+            text = if (usesPreRevolutionaryOrthography) {
+                "Звукъ и вибрація при нажатіи клавишъ. Оба отклика по умолчанію выключены."
+            } else {
+                "Звук и вибрация при нажатии клавиш. Оба отклика по умолчанию выключены."
             },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1090,7 +1143,7 @@ private fun AppSection.title(
     return when (this) {
         AppSection.HOME -> "Ижица"
         AppSection.ALPHABET -> {
-            if (usesPreRevolutionaryOrthography) "Азбука" else "Алфавит"
+            if (usesPreRevolutionaryOrthography) "Алфавитъ" else "Алфавит"
         }
         AppSection.SETTINGS -> "Настройки"
         AppSection.ABOUT -> {
@@ -1105,7 +1158,7 @@ private fun AppSection.shortTitle(
     return when (this) {
         AppSection.HOME -> "Главная"
         AppSection.ALPHABET -> {
-            if (usesPreRevolutionaryOrthography) "Азбука" else "Алфавит"
+            if (usesPreRevolutionaryOrthography) "Алфавитъ" else "Алфавит"
         }
         AppSection.SETTINGS -> "Настройки"
         AppSection.ABOUT -> {

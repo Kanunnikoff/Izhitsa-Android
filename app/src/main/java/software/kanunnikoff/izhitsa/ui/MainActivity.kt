@@ -1,30 +1,23 @@
 package software.kanunnikoff.izhitsa.ui
 
-import android.content.Context
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.annotation.UiThread
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.core.content.pm.PackageInfoCompat
-import com.android.billingclient.api.BillingClient
+import com.android.billingclient.api.ProductDetails
+import com.android.billingclient.api.Purchase
 import com.google.firebase.analytics.FirebaseAnalytics
 import software.kanunnikoff.izhitsa.AppPreferences
-import software.kanunnikoff.izhitsa.Core
-import software.kanunnikoff.izhitsa.Core.PRICE
-import software.kanunnikoff.izhitsa.Core.USD
+import software.kanunnikoff.izhitsa.R
 import software.kanunnikoff.izhitsa.billing.BillingManager
-import software.kanunnikoff.izhitsa.billing.BillingProvider
-import software.kanunnikoff.izhitsa.billing.MainViewController
-import software.kanunnikoff.izhitsa.percentOf
 
-class MainActivity : AppCompatActivity(), BillingProvider {
+class MainActivity : AppCompatActivity(), BillingManager.BillingUpdatesListener {
     internal var billingManager: BillingManager? = null
-    private var viewController: MainViewController? = null
     private lateinit var firebaseAnalytics: FirebaseAnalytics
     private lateinit var preferences: AppPreferences
     private var keyboardUsageState: MutableState<Boolean>? = null
@@ -33,13 +26,11 @@ class MainActivity : AppCompatActivity(), BillingProvider {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        Core.sharedPreferences = getSharedPreferences(
-            Core.APP_TAG,
-            Context.MODE_PRIVATE
-        )
         preferences = AppPreferences(context = applicationContext)
-        viewController = MainViewController(this)
-        billingManager = BillingManager(this, viewController!!.updateListener)
+        billingManager = BillingManager(
+            activity = this,
+            billingUpdatesListener = this
+        )
         firebaseAnalytics = FirebaseAnalytics.getInstance(this)
 
         val versionName = packageManager
@@ -54,17 +45,23 @@ class MainActivity : AppCompatActivity(), BillingProvider {
             val hasUsedKeyboard = checkNotNull(keyboardUsageState)
 
             IzhitsaApplication(
-                initialUsesSystemFont = preferences.usesSystemFont,
                 initialUsesPreRevolutionaryOrthography =
                     preferences.usesPreRevolutionaryOrthography,
+                initialIsKeyboardSoundFeedbackEnabled =
+                    preferences.isKeyboardSoundFeedbackEnabled,
+                initialIsKeyboardHapticFeedbackEnabled =
+                    preferences.isKeyboardHapticFeedbackEnabled,
                 hasUsedKeyboard = hasUsedKeyboard.value,
                 versionName = versionName,
                 versionCode = versionCode,
-                onUsesSystemFontChanged = { value ->
-                    preferences.usesSystemFont = value
-                },
                 onUsesPreRevolutionaryOrthographyChanged = { value ->
                     preferences.usesPreRevolutionaryOrthography = value
+                },
+                onKeyboardSoundFeedbackChanged = { value ->
+                    preferences.isKeyboardSoundFeedbackEnabled = value
+                },
+                onKeyboardHapticFeedbackChanged = { value ->
+                    preferences.isKeyboardHapticFeedbackEnabled = value
                 },
                 onSupportAuthor = ::supportAuthor
             )
@@ -91,81 +88,101 @@ class MainActivity : AppCompatActivity(), BillingProvider {
         super.onDestroy()
     }
 
-    override fun isPremiumPurchased(): Boolean {
-        return viewController?.isPremiumPurchased == true
-    }
-
-    fun onBillingManagerSetupFinished() {
+    override fun onBillingClientSetupFinished() {
         Log.d(Tag, "Клиент платежей настроен.")
     }
 
-    @UiThread
-    fun premiumPurchased() {
-        if (Core.isPremiumPurchased) {
-            return
+    override fun onTipsPurchased(
+        purchase: Purchase,
+        productDetails: ProductDetails?
+    ) {
+        runOnUiThread {
+            Toast.makeText(
+                this,
+                R.string.tips_acquired,
+                Toast.LENGTH_LONG
+            ).show()
         }
 
-        Core.isPremiumPurchased = true
-        Toast.makeText(
-            this,
-            "Премного благодарю за поддержку!",
-            Toast.LENGTH_LONG
-        ).show()
+        val offerDetails = productDetails?.oneTimePurchaseOfferDetails
+        val price = offerDetails
+            ?.priceAmountMicros
+            ?.toDouble()
+            ?.div(MicrosPerCurrencyUnit)
+        val quantity = purchase.quantity.toLong()
+        val purchaseItem = Bundle().apply {
+            putString(
+                FirebaseAnalytics.Param.ITEM_ID,
+                BillingManager.TIPS_PRODUCT_ID
+            )
+            putString(FirebaseAnalytics.Param.ITEM_NAME, TipsItemName)
+            putLong(FirebaseAnalytics.Param.QUANTITY, quantity)
 
-        val checkoutItem = Bundle().apply {
-            putString(FirebaseAnalytics.Param.ITEM_ID, Core.PREMIUM_SKU_ID)
-            putString(FirebaseAnalytics.Param.ITEM_NAME, "Поддержка автора")
-            putLong(FirebaseAnalytics.Param.QUANTITY, 1L)
-            putDouble(FirebaseAnalytics.Param.PRICE, PRICE.toDouble())
+            price?.let { value ->
+                putDouble(FirebaseAnalytics.Param.PRICE, value)
+            }
         }
-        val checkoutParams = Bundle().apply {
-            putString(FirebaseAnalytics.Param.CURRENCY, USD.currencyCode)
-            putDouble(FirebaseAnalytics.Param.VALUE, PRICE.toDouble())
+        val purchaseParams = Bundle().apply {
+            offerDetails?.priceCurrencyCode?.let { currencyCode ->
+                putString(FirebaseAnalytics.Param.CURRENCY, currencyCode)
+            }
+            price?.let { value ->
+                putDouble(
+                    FirebaseAnalytics.Param.VALUE,
+                    value * quantity
+                )
+            }
+            purchase.orderId?.let { orderId ->
+                putString(FirebaseAnalytics.Param.TRANSACTION_ID, orderId)
+            }
             putParcelableArray(
                 FirebaseAnalytics.Param.ITEMS,
-                arrayOf(checkoutItem)
+                arrayOf(purchaseItem)
             )
         }
-        firebaseAnalytics.logEvent(
-            FirebaseAnalytics.Event.BEGIN_CHECKOUT,
-            checkoutParams
-        )
 
-        val purchaseParams = Bundle().apply {
-            putString(FirebaseAnalytics.Param.CURRENCY, USD.currencyCode)
-            putDouble(
-                FirebaseAnalytics.Param.VALUE,
-                (GooglePlayRevenueShare percentOf PRICE).toDouble()
-            )
-            putString(
-                FirebaseAnalytics.Param.TRANSACTION_ID,
-                Core.PREMIUM_SKU_ID
-            )
-        }
         firebaseAnalytics.logEvent(
             FirebaseAnalytics.Event.PURCHASE,
             purchaseParams
         )
     }
 
-    private fun supportAuthor() {
-        if (Core.isPremiumPurchased || isPremiumPurchased()) {
+    override fun onBillingError() {
+        Log.e(Tag, "Не удалось открыть оплату чаевых.")
+
+        runOnUiThread {
             Toast.makeText(
                 this,
-                "Вы уже поддержали автора. Сердечное спасибо!",
+                R.string.couldnt_make_purchase,
                 Toast.LENGTH_LONG
             ).show()
-            return
         }
+    }
 
-        billingManager?.initiatePurchaseFlow(
-            productId = Core.PREMIUM_SKU_ID,
-            productType = BillingClient.ProductType.INAPP
+    internal fun supportAuthor() {
+        val addToCartParams = Bundle().apply {
+            putString(
+                FirebaseAnalytics.Param.ITEM_ID,
+                BillingManager.TIPS_PRODUCT_ID
+            )
+            putString(FirebaseAnalytics.Param.ITEM_NAME, TipsItemName)
+            putString(
+                FirebaseAnalytics.Param.ITEM_CATEGORY,
+                InAppPurchaseCategory
+            )
+        }
+        firebaseAnalytics.logEvent(
+            FirebaseAnalytics.Event.ADD_TO_CART,
+            addToCartParams
         )
+
+        billingManager?.initiateTipsPurchase() ?: onBillingError()
     }
 
     companion object {
         private const val Tag = "MainActivity"
-        private const val GooglePlayRevenueShare = 70
+        private const val TipsItemName = "Чаевые"
+        private const val InAppPurchaseCategory = "Покупки в приложении"
+        private const val MicrosPerCurrencyUnit = 1_000_000.0
     }
 }

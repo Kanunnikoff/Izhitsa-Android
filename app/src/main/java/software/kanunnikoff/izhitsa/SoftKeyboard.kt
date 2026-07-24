@@ -4,6 +4,11 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.inputmethodservice.InputMethodService
+import android.media.AudioManager
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.provider.Settings
 import android.text.InputType
 import android.view.KeyEvent
@@ -52,11 +57,16 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
     private var lastShiftTimeMillis = 0L
     private var alternativeTap: AlternativeTap? = null
     private var wordSeparators = ""
+    private var isKeyboardSoundFeedbackEnabled = false
 
     private val currentLayout = mutableStateOf(KeyboardLayouts.Russian)
     private val currentPanel = mutableStateOf(KeyboardPanel.KEYS)
     private val currentSuggestions = mutableStateOf<List<String>>(emptyList())
     private val currentClipboardText = mutableStateOf<String?>(null)
+    private val isKeyboardHapticFeedbackEnabled = mutableStateOf(false)
+    private lateinit var preferences: AppPreferences
+    private lateinit var audioManager: AudioManager
+    private lateinit var vibrator: Vibrator
     private lateinit var stickerContentSender: StickerContentSender
 
     private var baseLayout: List<List<KeyInfo>> = KeyboardLayouts.Russian
@@ -79,6 +89,15 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         super.onCreate()
 
         wordSeparators = resources.getString(R.string.word_separators)
+        preferences = AppPreferences(context = applicationContext)
+        audioManager = getSystemService(AudioManager::class.java)
+        vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            getSystemService(VibratorManager::class.java).defaultVibrator
+        } else {
+            @Suppress("DEPRECATION")
+            getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+        }
+        refreshFeedbackPreferences()
         russianDictionary = RussianDictionary(context = applicationContext)
         russianDictionary.prepare()
         stickerContentSender = StickerContentSender(
@@ -147,6 +166,8 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
                     suggestions = currentSuggestions.value,
                     clipboardText = currentClipboardText.value,
                     supportsStickerContent = supportsStickerContent,
+                    isHapticFeedbackEnabled =
+                        isKeyboardHapticFeedbackEnabled.value,
                     onKeyClick = ::onKey,
                     onKeyLongPressAction = ::handleKeyLongPressAction,
                     onAlternativeSelected = ::onAlternativeSelected,
@@ -220,7 +241,8 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
     ) {
         super.onStartInputView(info, restarting)
 
-        AppPreferences(context = applicationContext).hasUsedKeyboard = true
+        preferences.hasUsedKeyboard = true
+        refreshFeedbackPreferences()
         updateAutomaticShift()
         refreshTextState()
     }
@@ -309,6 +331,8 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
     }
 
     private fun onKey(key: KeyInfo): Boolean {
+        performKeyFeedback()
+
         val handled = when {
             isWordSeparator(code = key.code) -> {
                 alternativeTap = null
@@ -370,6 +394,7 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         key: KeyInfo,
         alternative: String
     ) {
+        performKeyFeedback()
         alternativeTap = null
 
         insertText(
@@ -471,6 +496,7 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
     private fun commitDirectText(text: String) {
         val inputConnection = currentInputConnection ?: return
 
+        performKeyFeedback()
         commitTyped(inputConnection = inputConnection)
         inputConnection.commitText(text, 1)
         alternativeTap = null
@@ -484,6 +510,7 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
 
         val inputConnection = currentInputConnection ?: return
 
+        performKeyFeedback()
         commitTyped(inputConnection = inputConnection)
         stickerContentSender.commit(
             inputConnection = inputConnection,
@@ -494,6 +521,8 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
     private fun commitSuggestion(suggestion: String) {
         val inputConnection = currentInputConnection ?: return
         val completionIndex = completionSuggestions.indexOf(suggestion)
+
+        performKeyFeedback()
 
         if (
             completionEnabled &&
@@ -951,6 +980,42 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         currentPanel.value = KeyboardPanel.KEYS
     }
 
+    private fun refreshFeedbackPreferences() {
+        isKeyboardSoundFeedbackEnabled =
+            preferences.isKeyboardSoundFeedbackEnabled
+        isKeyboardHapticFeedbackEnabled.value =
+            preferences.isKeyboardHapticFeedbackEnabled
+    }
+
+    private fun performKeyFeedback() {
+        if (isKeyboardSoundFeedbackEnabled) {
+            audioManager.playSoundEffect(AudioManager.FX_KEYPRESS_STANDARD)
+        }
+
+        if (
+            !isKeyboardHapticFeedbackEnabled.value ||
+            !vibrator.hasVibrator()
+        ) {
+            return
+        }
+
+        /*
+         * На Android 10 и новее используем короткий системный эффект: устройство
+         * само подбирает подходящую силу для своего вибромотора. На Android 8 и 9
+         * воспроизводим короткий одиночный импульс с системной амплитудой.
+         */
+        val vibrationEffect = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            VibrationEffect.createPredefined(VibrationEffect.EFFECT_TICK)
+        } else {
+            VibrationEffect.createOneShot(
+                KeyVibrationDurationMillis,
+                VibrationEffect.DEFAULT_AMPLITUDE
+            )
+        }
+
+        vibrator.vibrate(vibrationEffect)
+    }
+
     private fun isWordSeparator(code: Int): Boolean {
         return code > 0 && wordSeparators.contains(code.toChar())
     }
@@ -989,6 +1054,7 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         const val MaxClipboardCharacterCount = 10_000
         const val AlternativeTapTimeoutMillis = 500L
         const val ShiftDoubleTapTimeoutMillis = 800L
+        const val KeyVibrationDurationMillis = 10L
     }
 }
 

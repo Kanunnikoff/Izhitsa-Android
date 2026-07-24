@@ -7,20 +7,15 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
-import com.android.billingclient.api.BillingClient
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
-import com.google.android.material.snackbar.Snackbar
 import com.google.firebase.analytics.FirebaseAnalytics
-import software.kanunnikoff.izhitsa.Core
 import software.kanunnikoff.izhitsa.R
-import software.kanunnikoff.izhitsa.billing.BillingManager
 
 class MenuBottomSheet : BottomSheetDialogFragment() {
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
         val view = inflater.inflate(R.layout.menu_bottom_sheet, null)
 
-        val billingManager = (requireActivity() as? MainActivity)?.billingManager
         val packageName = requireActivity().packageName
         val analytics = FirebaseAnalytics.getInstance(requireContext())
 
@@ -62,22 +57,7 @@ class MenuBottomSheet : BottomSheetDialogFragment() {
         }
 
         view.findViewById<TextView>(R.id.donateButton).setOnClickListener {
-            if (!Core.isPremiumPurchased) {
-                if (billingManager != null && billingManager.billingClientResponseCode > BillingManager.BILLING_MANAGER_NOT_INITIALIZED) {
-                    billingManager.initiatePurchaseFlow(Core.PREMIUM_SKU_ID, BillingClient.ProductType.INAPP)
-                    val cartParams = Bundle().apply {
-                        putString(FirebaseAnalytics.Param.CURRENCY, Core.USD.currencyCode)
-                        putDouble(FirebaseAnalytics.Param.VALUE, Core.PRICE.toDouble())
-                        putString(FirebaseAnalytics.Param.ITEM_ID, Core.PREMIUM_SKU_ID)
-                        putString(FirebaseAnalytics.Param.ITEM_NAME, "Premium")
-                        putString(FirebaseAnalytics.Param.ITEM_CATEGORY, "In-App Purchases")
-                    }
-                    analytics.logEvent(FirebaseAnalytics.Event.ADD_TO_CART, cartParams)
-                }
-            } else {
-                Snackbar.make(view, getString(R.string.premium_already_purchased), Snackbar.LENGTH_LONG).show()
-            }
-
+            (requireActivity() as? MainActivity)?.supportAuthor()
             dismiss()
         }
 

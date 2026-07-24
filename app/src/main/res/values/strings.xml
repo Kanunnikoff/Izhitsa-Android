@@ -18,8 +18,8 @@
     <string name="translator_button">Переводчикъ въ Google Play</string>
     <string name="donate_button">Поддержать автора</string>
     <string name="copyright">© Дмитрiй Канунниковъ, в3.0.0</string>
-    <string name="premium_purchased">Вашъ платёжъ полученъ. Премногая благодарность за поддержку!</string>
-    <string name="premium_already_purchased">Вы уже поддержали автора. Достаточно одного раза. Сердечное спасибо!</string>
+    <string name="tips_acquired">Спасибо огромное за Вашу поддержку! Приятного использования приложения!</string>
+    <string name="couldnt_make_purchase">Не удалось осуществить платёж. Пожалуйста, попробуйте позже.</string>
 
 
     <!-- Symbols that are commonly considered word separators in this language -->

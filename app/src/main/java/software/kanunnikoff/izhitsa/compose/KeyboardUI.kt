@@ -155,6 +155,7 @@ fun KeyboardScreen(
     suggestions: List<String>,
     clipboardText: String?,
     supportsStickerContent: Boolean,
+    isHapticFeedbackEnabled: Boolean,
     onKeyClick: (KeyInfo) -> Boolean,
     onKeyLongPressAction: (KeyLongPressAction) -> Unit,
     onAlternativeSelected: (KeyInfo, String) -> Unit,
@@ -198,6 +199,8 @@ fun KeyboardScreen(
                         NumberKeyboardRows(
                             rows = rows,
                             palette = palette,
+                            isHapticFeedbackEnabled =
+                                isHapticFeedbackEnabled,
                             onKeyClick = onKeyClick,
                             onKeyLongPressAction = onKeyLongPressAction,
                             onAlternativeSelected = onAlternativeSelected,
@@ -209,6 +212,8 @@ fun KeyboardScreen(
                         KeyboardRows(
                             rows = rows,
                             palette = palette,
+                            isHapticFeedbackEnabled =
+                                isHapticFeedbackEnabled,
                             onKeyClick = onKeyClick,
                             onKeyLongPressAction = onKeyLongPressAction,
                             onAlternativeSelected = onAlternativeSelected,
@@ -606,6 +611,7 @@ private fun PanelToolbar(
 private fun KeyboardRows(
     rows: List<List<KeyInfo>>,
     palette: KeyboardPalette,
+    isHapticFeedbackEnabled: Boolean,
     onKeyClick: (KeyInfo) -> Boolean,
     onKeyLongPressAction: (KeyLongPressAction) -> Unit,
     onAlternativeSelected: (KeyInfo, String) -> Unit,
@@ -630,6 +636,8 @@ private fun KeyboardRows(
                         modifier = Modifier.weight(key.weight),
                         palette = palette,
                         isBottomRow = rowIndex == rows.lastIndex,
+                        isHapticFeedbackEnabled =
+                            isHapticFeedbackEnabled,
                         onClick = { onKeyClick(key) },
                         onLongPressAction = onKeyLongPressAction,
                         onAlternativeMenuVisibilityChanged =
@@ -652,6 +660,7 @@ private fun KeyboardRows(
 private fun NumberKeyboardRows(
     rows: List<List<KeyInfo>>,
     palette: KeyboardPalette,
+    isHapticFeedbackEnabled: Boolean,
     onKeyClick: (KeyInfo) -> Boolean,
     onKeyLongPressAction: (KeyLongPressAction) -> Unit,
     onAlternativeSelected: (KeyInfo, String) -> Unit,
@@ -704,6 +713,8 @@ private fun NumberKeyboardRows(
                                 modifier = Modifier.weight(1f),
                                 palette = palette,
                                 isBottomRow = false,
+                                isHapticFeedbackEnabled =
+                                    isHapticFeedbackEnabled,
                                 onClick = { onKeyClick(key) },
                                 onLongPressAction = onKeyLongPressAction,
                                 onAlternativeMenuVisibilityChanged =
@@ -727,6 +738,8 @@ private fun NumberKeyboardRows(
                         modifier = Modifier.weight(1f),
                         palette = palette,
                         isBottomRow = false,
+                        isHapticFeedbackEnabled =
+                            isHapticFeedbackEnabled,
                         onClick = { onKeyClick(key) },
                         onLongPressAction = onKeyLongPressAction,
                         onAlternativeMenuVisibilityChanged =
@@ -753,6 +766,8 @@ private fun NumberKeyboardRows(
                     modifier = Modifier.weight(key.weight),
                     palette = palette,
                     isBottomRow = true,
+                    isHapticFeedbackEnabled =
+                        isHapticFeedbackEnabled,
                     onClick = { onKeyClick(key) },
                     onLongPressAction = onKeyLongPressAction,
                     onAlternativeMenuVisibilityChanged =
@@ -809,6 +824,7 @@ private fun KeyButton(
     modifier: Modifier = Modifier,
     palette: KeyboardPalette,
     isBottomRow: Boolean,
+    isHapticFeedbackEnabled: Boolean,
     onClick: () -> Boolean,
     onLongPressAction: (KeyLongPressAction) -> Unit,
     onAlternativeMenuVisibilityChanged: (Boolean) -> Unit,
@@ -879,7 +895,11 @@ private fun KeyButton(
                     }
                 }
             }
-            .pointerInput(key, longPressTimeoutMillis) {
+            .pointerInput(
+                key,
+                longPressTimeoutMillis,
+                isHapticFeedbackEnabled
+            ) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     var releasedBeforeLongPress = false
@@ -912,8 +932,6 @@ private fun KeyButton(
                     }
 
                     if (key.repeatOnLongPress) {
-                        hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
-
                         var canContinueDeleting = onClick()
                         var released = false
 
@@ -957,7 +975,11 @@ private fun KeyButton(
                         return@awaitEachGesture
                     }
 
-                    hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
+                    if (isHapticFeedbackEnabled) {
+                        hapticFeedback.performHapticFeedback(
+                            HapticFeedbackType.LongPress
+                        )
+                    }
 
                     selectedAlternativeIndex = key.defaultMenuItemIndex()
                     alternativesVisible = true
