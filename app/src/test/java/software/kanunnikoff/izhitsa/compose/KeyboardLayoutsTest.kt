@@ -63,21 +63,28 @@ class KeyboardLayoutsTest {
     }
 
     @Test
-    fun `цифровые подсказки верхнего ряда доступны по удержанию`() {
-        val hintedKeys = KeyboardLayouts.Russian
-            .first()
-            .filter { key -> key.hint != null }
+    fun `цифровые подсказки верхнего ряда доступны по удержанию в буквенных раскладках`() {
+        val alphabeticLayouts = listOf(
+            KeyboardLayouts.Russian,
+            KeyboardLayouts.English
+        )
 
-        assertEquals(10, hintedKeys.size)
+        alphabeticLayouts.forEach { layout ->
+            val hintedKeys = layout
+                .first()
+                .filter { key -> key.hint != null }
 
-        hintedKeys.forEach { key ->
-            val hint = requireNotNull(key.hint)
+            assertEquals(10, hintedKeys.size)
 
-            assertTrue(key.alternatives.contains(hint))
-            assertEquals(
-                hint,
-                key.alternatives[requireNotNull(key.preferredAlternativeIndex)]
-            )
+            hintedKeys.forEach { key ->
+                val hint = requireNotNull(key.hint)
+
+                assertTrue(key.alternatives.contains(hint))
+                assertEquals(
+                    hint,
+                    key.alternatives[requireNotNull(key.preferredAlternativeIndex)]
+                )
+            }
         }
     }
 

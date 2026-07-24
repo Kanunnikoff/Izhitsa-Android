@@ -285,32 +285,32 @@ object KeyboardLayouts {
 
     val English = listOf(
         listOf(
-            key("q", hint = "1"),
-            key("w", hint = "2"),
-            key(
+            digitHintKey(label = "q", digit = "1"),
+            digitHintKey(label = "w", digit = "2"),
+            digitHintKey(
                 label = "e",
-                hint = "3",
+                digit = "3",
                 alternatives = listOf("e", "é", "è", "ê", "ë")
             ),
-            key("r", hint = "4"),
-            key("t", hint = "5"),
-            key("y", hint = "6"),
-            key(
+            digitHintKey(label = "r", digit = "4"),
+            digitHintKey(label = "t", digit = "5"),
+            digitHintKey(label = "y", digit = "6"),
+            digitHintKey(
                 label = "u",
-                hint = "7",
+                digit = "7",
                 alternatives = listOf("u", "ú", "ù", "û", "ü")
             ),
-            key(
+            digitHintKey(
                 label = "i",
-                hint = "8",
+                digit = "8",
                 alternatives = listOf("i", "í", "ì", "î", "ï")
             ),
-            key(
+            digitHintKey(
                 label = "o",
-                hint = "9",
+                digit = "9",
                 alternatives = listOf("o", "ó", "ò", "ô", "ö")
             ),
-            key("p", hint = "0")
+            digitHintKey(label = "p", digit = "0")
         ),
         listOf(
             key(
