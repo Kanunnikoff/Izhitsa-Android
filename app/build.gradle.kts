@@ -12,8 +12,8 @@ android {
         applicationId = "software.kanunnikoff.izhitsa"
         minSdk = 26
         targetSdk = 37
-        versionCode = 12
-        versionName = "3.0.0"
+        versionCode = 6
+        versionName = "2.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

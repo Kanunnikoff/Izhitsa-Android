@@ -263,8 +263,8 @@ object KeyboardLayouts {
             key("м"),
             key(
                 label = "и",
-                alternatives = listOf("и", "i", "ѵ", acute("и")),
-                tapAlternatives = listOf("и", "i", "ѵ")
+                alternatives = listOf("и", "і", "ѵ", acute("и")),
+                tapAlternatives = listOf("и", "і", "ѵ")
             ),
             key("т"),
             key(

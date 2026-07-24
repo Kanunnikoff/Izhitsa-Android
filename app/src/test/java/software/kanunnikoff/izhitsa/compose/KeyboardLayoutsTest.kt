@@ -97,6 +97,18 @@ class KeyboardLayoutsTest {
     }
 
     @Test
+    fun `клавиша и содержит кириллическую і десятеричную`() {
+        val iKey = KeyboardLayouts.Russian
+            .flatten()
+            .single { key -> key.label == "и" }
+
+        assertTrue(iKey.alternatives.contains("і"))
+        assertTrue(iKey.tapAlternatives.contains("і"))
+        assertFalse(iKey.alternatives.contains("i"))
+        assertFalse(iKey.tapAlternatives.contains("i"))
+    }
+
+    @Test
     fun `удержание Backspace повторяется во всех раскладках`() {
         val layouts = listOf(
             KeyboardLayouts.Russian,

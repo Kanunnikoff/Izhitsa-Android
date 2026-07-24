@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "496764300974",
+    "project_id": "izhitsa-43576",
+    "storage_bucket": "izhitsa-43576.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:496764300974:android:fbdee8b5d0fce0b688473f",
+        "android_client_info": {
+          "package_name": "software.kanunnikoff.izhitsa"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDi23x6QcCnTKOf1TdYF4qwR9oHCH0bZ08"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

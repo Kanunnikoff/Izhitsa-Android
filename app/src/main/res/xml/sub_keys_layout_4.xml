@@ -9,7 +9,7 @@
 
     <Row>
         <Key android:codes="1080" android:keyLabel="и" android:keyEdgeFlags="left"/>
-        <Key android:codes="1110" android:keyLabel="i" />
+        <Key android:codes="1110" android:keyLabel="і" />
         <Key android:codes="1141" android:keyLabel="ѵ" android:keyEdgeFlags="right"/>
     </Row>
 </Keyboard>
