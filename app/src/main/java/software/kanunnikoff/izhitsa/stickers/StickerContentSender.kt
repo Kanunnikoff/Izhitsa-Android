@@ -5,9 +5,19 @@ import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputContentInfo
 
+/**
+ * Передаёт стикеры в поле ввода через протокол содержимого метода ввода.
+ *
+ * @property repository хранилище, предоставляющее доступный получателю URI файла.
+ */
 class StickerContentSender(
     private val repository: StickerRepository
 ) {
+    /**
+     * Проверяет, объявило ли текущее поле ввода поддержку изображений PNG.
+     *
+     * @param editorInfo сведения о поле, полученные службой метода ввода.
+     */
     fun isSupported(editorInfo: EditorInfo): Boolean {
         return editorInfo.contentMimeTypes.orEmpty().any { mimeType ->
             ClipDescription.compareMimeTypes(
@@ -17,6 +27,13 @@ class StickerContentSender(
         }
     }
 
+    /**
+     * Вставляет [sticker] в приложение, владеющее [inputConnection].
+     *
+     * @param inputConnection соединение с принимающим полем.
+     * @param sticker выбранный стикер.
+     * @return `true`, если получатель принял содержимое.
+     */
     fun commit(
         inputConnection: InputConnection,
         sticker: Sticker

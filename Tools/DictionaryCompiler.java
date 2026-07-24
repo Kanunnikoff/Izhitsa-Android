@@ -13,17 +13,42 @@ import java.util.List;
 import java.util.Locale;
 import java.util.zip.Deflater;
 
+/**
+ * Собирает исходные списки русских слов и фамилий в двоичный словарь Ижицы.
+ *
+ * <p>Слова должны быть заранее отсортированы. Компилятор делит их на блоки,
+ * кодирует общие начала соседних слов и сохраняет сжатый вариант блока только
+ * тогда, когда он действительно короче исходного.</p>
+ */
 public final class DictionaryCompiler {
+    /** Сигнатура двоичного формата. */
     private static final byte[] MAGIC = "IZHDICT2".getBytes(StandardCharsets.US_ASCII);
+
+    /** Текущая версия двоичного формата. */
     private static final int VERSION = 1;
+
+    /** Наибольшее число слов в одном независимо декодируемом блоке. */
     private static final int WORDS_PER_BLOCK = 256;
+
+    /** Код блока без сжатия. */
     private static final int CODEC_RAW = 0;
+
+    /** Код блока, сжатого алгоритмом DEFLATE. */
     private static final int CODEC_DEFLATE = 1;
+
+    /** Правила регистра, применяемые к русским словам. */
     private static final Locale RUSSIAN_LOCALE = Locale.forLanguageTag("ru-RU");
 
+    /** Запрещает создание экземпляров служебного класса. */
     private DictionaryCompiler() {
     }
 
+    /**
+     * Читает два исходных файла и записывает готовый {@code russian.bin}.
+     *
+     * @param arguments пути к словам, фамилиям и итоговому файлу.
+     * @throws IOException если исходные или итоговый файл недоступны.
+     */
     public static void main(String[] arguments) throws IOException {
         if (arguments.length != 3) {
             throw new IllegalArgumentException(
@@ -47,6 +72,14 @@ public final class DictionaryCompiler {
         System.out.println("Размер двоичного словаря: " + output.length + " байт");
     }
 
+    /**
+     * Проверяет и преобразует один отсортированный список в индексированные блоки.
+     *
+     * @param identifier номер раздела в двоичном файле.
+     * @param sourcePath путь к исходному списку.
+     * @return скомпилированный раздел.
+     * @throws IOException если исходный файл недоступен.
+     */
     private static Section compileSection(
         int identifier,
         Path sourcePath
@@ -106,6 +139,13 @@ public final class DictionaryCompiler {
         return new Section(identifier, blocks, wordCount);
     }
 
+    /**
+     * Кодирует общие начала слов и выбирает наиболее компактный вид блока.
+     *
+     * @param words отсортированные слова блока в UTF-8.
+     * @return закодированный блок.
+     * @throws IOException если промежуточный поток не смог принять данные.
+     */
     private static Block compileBlock(List<byte[]> words) throws IOException {
         ByteArrayOutputStream encoded = new ByteArrayOutputStream();
         byte[] previousWord = new byte[0];
@@ -133,6 +173,12 @@ public final class DictionaryCompiler {
         );
     }
 
+    /**
+     * Сжимает содержимое блока алгоритмом DEFLATE с наилучшим уровнем сжатия.
+     *
+     * @param source исходные байты.
+     * @return сжатые байты.
+     */
     private static byte[] deflate(byte[] source) {
         Deflater deflater = new Deflater(Deflater.BEST_COMPRESSION);
         deflater.setInput(source);
@@ -145,6 +191,13 @@ public final class DictionaryCompiler {
         return Arrays.copyOf(buffer, length);
     }
 
+    /**
+     * Собирает заголовок, индексы и содержимое всех разделов в один файл.
+     *
+     * @param sections разделы в порядке записи.
+     * @return содержимое итогового файла.
+     * @throws IOException если промежуточный поток не смог принять данные.
+     */
     private static byte[] makeFile(List<Section> sections) throws IOException {
         int fixedHeaderSize = MAGIC.length + Integer.BYTES + Integer.BYTES;
         int descriptorSize = Integer.BYTES + Integer.BYTES + Long.BYTES;
@@ -194,6 +247,13 @@ public final class DictionaryCompiler {
         return bytes.toByteArray();
     }
 
+    /**
+     * Возвращает число одинаковых начальных байтов двух слов UTF-8.
+     *
+     * @param first первое слово.
+     * @param second второе слово.
+     * @return длина общего начала.
+     */
     private static int commonPrefixLength(byte[] first, byte[] second) {
         int maximumLength = Math.min(first.length, second.length);
         int length = 0;
@@ -205,6 +265,13 @@ public final class DictionaryCompiler {
         return length;
     }
 
+    /**
+     * Сравнивает байтовые слова как беззнаковые последовательности.
+     *
+     * @param first первое слово.
+     * @param second второе слово.
+     * @return отрицательное, нулевое или положительное значение сравнения.
+     */
     private static int compareUnsigned(byte[] first, byte[] second) {
         int maximumLength = Math.min(first.length, second.length);
 
@@ -220,6 +287,12 @@ public final class DictionaryCompiler {
         return first.length - second.length;
     }
 
+    /**
+     * Записывает неотрицательное целое семибитными группами переменной длины.
+     *
+     * @param output поток-получатель.
+     * @param value записываемое значение.
+     */
     private static void writeVariableLengthInteger(
         ByteArrayOutputStream output,
         int value
@@ -238,11 +311,23 @@ public final class DictionaryCompiler {
         } while (remainingValue > 0);
     }
 
+    /**
+     * Раздел словаря и его сводные данные.
+     *
+     * @param identifier номер раздела.
+     * @param blocks закодированные блоки.
+     * @param wordCount общее число слов.
+     */
     private record Section(
         int identifier,
         List<Block> blocks,
         int wordCount
     ) {
+        /**
+         * Возвращает точный размер двоичного индекса раздела.
+         *
+         * @return размер индекса в байтах.
+         */
         int indexSize() {
             return blocks.stream()
                 .mapToInt(block ->
@@ -258,6 +343,15 @@ public final class DictionaryCompiler {
         }
     }
 
+    /**
+     * Закодированный блок соседних слов.
+     *
+     * @param firstWord первое слово для двоичного поиска.
+     * @param payload сохранённое содержимое.
+     * @param uncompressedLength размер до сжатия.
+     * @param wordCount число слов.
+     * @param codec способ хранения.
+     */
     private record Block(
         byte[] firstWord,
         byte[] payload,
@@ -267,13 +361,26 @@ public final class DictionaryCompiler {
     ) {
     }
 
+    /** Записывает многобайтовые числа в порядке от младшего байта к старшему. */
     private static final class LittleEndianWriter {
+        /** Поток, принимающий готовые байты. */
         private final DataOutputStream output;
 
+        /**
+         * Создаёт писатель поверх буфера результата.
+         *
+         * @param output поток-получатель.
+         */
         private LittleEndianWriter(ByteArrayOutputStream output) {
             this.output = new DataOutputStream(output);
         }
 
+        /**
+         * Записывает 16-разрядное целое.
+         *
+         * @param value записываемое значение.
+         * @throws IOException если поток не принял данные.
+         */
         private void writeShort(int value) throws IOException {
             output.write(
                 ByteBuffer.allocate(Short.BYTES)
@@ -283,6 +390,12 @@ public final class DictionaryCompiler {
             );
         }
 
+        /**
+         * Записывает 32-разрядное целое.
+         *
+         * @param value записываемое значение.
+         * @throws IOException если поток не принял данные.
+         */
         private void writeInt(int value) throws IOException {
             output.write(
                 ByteBuffer.allocate(Integer.BYTES)
@@ -292,6 +405,12 @@ public final class DictionaryCompiler {
             );
         }
 
+        /**
+         * Записывает 64-разрядное целое.
+         *
+         * @param value записываемое значение.
+         * @throws IOException если поток не принял данные.
+         */
         private void writeLong(long value) throws IOException {
             output.write(
                 ByteBuffer.allocate(Long.BYTES)

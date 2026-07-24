@@ -3,18 +3,41 @@ package software.kanunnikoff.izhitsa.compose
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.sp
 
+/**
+ * Коды служебных клавиш.
+ *
+ * Отрицательные значения не пересекаются с кодовыми точками печатаемых символов.
+ */
 object KeyboardKeyCodes {
+    /** Переключение регистра. */
     const val SHIFT = -1
+
+    /** Возврат к буквенной раскладке. */
     const val MODE_ALPHA = -2
+
+    /** Переход ко второй странице символов. */
     const val MORE_SYMBOLS = -4
+
+    /** Удаление символа перед курсором. */
     const val DELETE = -5
+
+    /** Переход к первой странице символов. */
     const val SYMBOLS = -6
+
+    /** Переход к цифровой раскладке. */
     const val NUMBER_PAD = -7
+
+    /** Смена русского и английского языков. */
     const val LANGUAGE = -101
+
+    /** Перевод строки либо действие редактора. */
     const val ENTER = 10
+
+    /** Обычный пробел. */
     const val SPACE = 32
 }
 
+/** Имена значков, которые представление сопоставляет ресурсам Compose или приложения. */
 enum class KeyIcon {
     BACKSPACE,
     DONE,
@@ -27,6 +50,7 @@ enum class KeyIcon {
     NUMBER_PAD
 }
 
+/** Готовые раскладки и фабрики их клавиш. */
 object KeyboardLayouts {
     private val ModifierKeyLabelFontSize = 20.sp
     private val SmallSymbolLabelFontSize = 22.sp
@@ -37,6 +61,7 @@ object KeyboardLayouts {
         ";", "/", "(", ")", "#", "!", ",", "?"
     )
 
+    /** Первая страница цифр и наиболее употребительных символов. */
     val Symbols = listOf(
         listOf(
             key("1"), key("2"), key("3"), key("4"), key("5"),
@@ -119,6 +144,7 @@ object KeyboardLayouts {
         )
     )
 
+    /** Вторая страница специальных символов. */
     val Symbols2 = listOf(
         listOf(
             key("~"),
@@ -215,6 +241,7 @@ object KeyboardLayouts {
         )
     )
 
+    /** Русская буквенная раскладка с дореформенными вариантами по удержанию. */
     val Russian = listOf(
         listOf(
             digitHintKey(label = "й", digit = "1"),
@@ -283,6 +310,7 @@ object KeyboardLayouts {
         alphabetBottomRow(language = "Русскій")
     )
 
+    /** Английская буквенная раскладка. */
     val English = listOf(
         listOf(
             digitHintKey(label = "q", digit = "1"),
@@ -343,6 +371,7 @@ object KeyboardLayouts {
         alphabetBottomRow(language = "English")
     )
 
+    /** Цифровая раскладка для полей, запрашивающих набор чисел. */
     val Numbers = listOf(
         listOf(
             key("+", weight = 0.8f, fontSize = NumberOperatorLabelFontSize),
@@ -396,6 +425,11 @@ object KeyboardLayouts {
         )
     )
 
+    /**
+     * Собирает общий нижний ряд буквенных раскладок.
+     *
+     * @param language название языка на пробеле.
+     */
     private fun alphabetBottomRow(language: String): List<KeyInfo> {
         return listOf(
             special(KeyboardKeyCodes.SYMBOLS, "?123", weight = BottomPillKeyWeight),
@@ -416,6 +450,11 @@ object KeyboardLayouts {
         )
     }
 
+    /**
+     * Создаёт запятую, которая долгим нажатием открывает панель эмодзи.
+     *
+     * @param weight доля ширины ряда.
+     */
     private fun emojiCommaKey(weight: Float = 1f): KeyInfo {
         /*
          * Клавиша сохраняет код обычной запятой, поэтому короткое нажатие продолжает
@@ -432,6 +471,7 @@ object KeyboardLayouts {
         )
     }
 
+    /** Создаёт точку с полным набором знаков быстрого выбора. */
     private fun periodKey(): KeyInfo {
         return special(
             code = ".".first().code,
@@ -443,6 +483,18 @@ object KeyboardLayouts {
         )
     }
 
+    /**
+     * Создаёт обычную печатаемую клавишу.
+     *
+     * @param label основная надпись и источник кода символа.
+     * @param hint дополнительная надпись в углу.
+     * @param alternatives пункты меню долгого нажатия.
+     * @param tapAlternatives варианты повторных коротких нажатий.
+     * @param alternativeRowLengths распределение вариантов по строкам.
+     * @param preferredAlternativeIndex вариант, совмещённый с клавишей.
+     * @param weight доля ширины ряда.
+     * @param fontSize явно заданный размер надписи.
+     */
     private fun key(
         label: String,
         hint: String? = null,
@@ -466,6 +518,18 @@ object KeyboardLayouts {
         )
     }
 
+    /**
+     * Создаёт служебную клавишу, не участвующую в смене регистра букв.
+     *
+     * @param code отрицательный служебный код либо код печатаемого знака.
+     * @param label необязательная надпись.
+     * @param icon необязательный значок вместо надписи.
+     * @param weight доля ширины ряда.
+     * @param fontSize явно заданный размер надписи.
+     * @param alternatives пункты меню долгого нажатия.
+     * @param alternativeRowLengths распределение вариантов по строкам.
+     * @param preferredAlternativeIndex вариант, совмещённый с клавишей.
+     */
     private fun special(
         code: Int,
         label: String? = null,
@@ -489,6 +553,14 @@ object KeyboardLayouts {
         )
     }
 
+    /**
+     * Создаёт служебную клавишу, содержимое которой представлено только значком.
+     *
+     * @param code служебный код.
+     * @param icon отображаемый значок.
+     * @param weight доля ширины ряда.
+     * @param repeatOnLongPress повторять ли действие при удержании.
+     */
     private fun iconKey(
         code: Int,
         icon: KeyIcon,
@@ -502,6 +574,12 @@ object KeyboardLayouts {
         ).copy(repeatOnLongPress = repeatOnLongPress)
     }
 
+    /**
+     * Создаёт Enter; его действие и значок уточняются по текущему
+     * [android.view.inputmethod.EditorInfo].
+     *
+     * @param weight доля ширины ряда.
+     */
     private fun enterKey(weight: Float = BottomPillKeyWeight): KeyInfo {
         return KeyInfo(
             code = KeyboardKeyCodes.ENTER,
@@ -511,6 +589,13 @@ object KeyboardLayouts {
         )
     }
 
+    /**
+     * Создаёт букву с цифрой-подсказкой, доступной только через долгое нажатие.
+     *
+     * @param label основная буква.
+     * @param digit цифра в углу и меню удержания.
+     * @param alternatives остальные варианты удержания.
+     */
     private fun digitHintKey(
         label: String,
         digit: String,
@@ -527,6 +612,11 @@ object KeyboardLayouts {
         )
     }
 
+    /**
+     * Создаёт гласную с вариантом, содержащим комбинируемое ударение.
+     *
+     * @param label основная буква.
+     */
     private fun vowelKey(label: String): KeyInfo {
         return key(
             label = label,
@@ -535,6 +625,11 @@ object KeyboardLayouts {
         )
     }
 
+    /**
+     * Добавляет к букве комбинируемый знак острого ударения.
+     *
+     * @param letter исходная буква.
+     */
     private fun acute(letter: String): String {
         return letter + CombiningAcuteAccent
     }

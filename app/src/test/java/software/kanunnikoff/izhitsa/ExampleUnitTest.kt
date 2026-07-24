@@ -4,12 +4,9 @@ import org.junit.Test
 
 import org.junit.Assert.*
 
-/**
- * Example local unit test, which will execute on the development machine (host).
- *
- * See [testing documentation](http://d.android.com/tools/testing).
- */
+/** Простая проверка, подтверждающая работоспособность локального набора JUnit. */
 class ExampleUnitTest {
+    /** Проверяет выполнение и базовое утверждение без среды Android. */
     @Test
     fun addition_isCorrect() {
         assertEquals(4, 2 + 2)

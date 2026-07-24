@@ -1,36 +1,7 @@
 <resources>
     <string name="app_name">Ижица</string>
-    <string name="welcome_text">
-        Отрадно видѣть, что даже спустя столѣтіе ​есть​ люди, для которыхъ дорога или, какъ минимумъ, интересна орѳографія русскаго языка до реформы 1918-го года!
-    </string>
-    <string name="install_text">
-        Для включенія дореволюціонной клавіатуры выполните ​слѣдующіе​ шаги:\n
-        • въ Настройкахъ устройства зайдите въ раздѣлъ Языкъ и вводъ -> Экранная клавіатура -> Управленіе клавіатурами\n
-        • включите клавіатуру съ названіемъ Ижица
-    </string>
-    <string name="info_text">
-        Клавіатура содержитъ ​дополнительныя​ 4 буквы дореформенной орѳографіи: ять (ѣ), фиту (ѳ), и-десятичное (і) и, собственно, ижицу (ѵ).\nБуквы \'ь\', \'е\', \'ф\' и \'и\' позволяютъ печатать еръ; ять, ё; фиту; и-десятичное и ижицу соотвѣтственно быстрымъ двойнымъ нажатіемъ или же долгимъ удержаніемъ.
-    </string>
-    <string name="menu_button">Меню</string>
-    <string name="rate_button">Оцѣнить въ Google Play</string>
-    <string name="share_button">Подѣлиться</string>
-    <string name="other_apps_button">Другiя приложенiя</string>
-    <string name="translator_button">Переводчикъ въ Google Play</string>
-    <string name="donate_button">Поддержать автора</string>
-    <string name="copyright">© Дмитрiй Канунниковъ, в3.0.0</string>
     <string name="tips_acquired">Спасибо огромное за Вашу поддержку! Приятного использования приложения!</string>
     <string name="couldnt_make_purchase">Не удалось осуществить платёж. Пожалуйста, попробуйте позже.</string>
-
-
     <!-- Symbols that are commonly considered word separators in this language -->
     <string name="word_separators">\u0020.,;:!?\n()[]*&amp;@{}/&lt;&gt;_+=|&quot;</string>
-
-    <!-- Labels on soft keys -->
-    <string name="label_go_key">Вперёдъ</string>
-    <string name="label_next_key">Далѣе</string>
-    <string name="label_send_key">Отправить</string>
-
-    <!-- Labels for subtype -->
-    <string name="label_subtype_generic">%s</string>
-    <string name="label_subtype_en_GB">English (GB)</string>
 </resources>

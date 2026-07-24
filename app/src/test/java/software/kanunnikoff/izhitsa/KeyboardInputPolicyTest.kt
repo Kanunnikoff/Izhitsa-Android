@@ -6,7 +6,9 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/** Проверяет выбор безопасного режима передачи незавершённого слова редактору. */
 class KeyboardInputPolicyTest {
+    /** Android 9 не должен использовать ненадёжную составную область. */
     @Test
     fun androidNineDoesNotUseUnreliableComposingRegion() {
         assertFalse(
@@ -18,6 +20,7 @@ class KeyboardInputPolicyTest {
         )
     }
 
+    /** Начиная с Android 10 текстовое поле с подсказками использует составную область. */
     @Test
     fun androidTenUsesComposingRegionForPredictiveText() {
         assertTrue(
@@ -29,6 +32,7 @@ class KeyboardInputPolicyTest {
         )
     }
 
+    /** Отключённые подсказки исключают составную область независимо от версии Android. */
     @Test
     fun composingRegionIsNotUsedWhenPredictionsAreDisabled() {
         assertFalse(
@@ -40,6 +44,7 @@ class KeyboardInputPolicyTest {
         )
     }
 
+    /** Числовое поле не должно получать составной текст. */
     @Test
     fun composingRegionIsNotUsedForNonTextInput() {
         assertFalse(

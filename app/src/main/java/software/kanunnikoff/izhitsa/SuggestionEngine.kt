@@ -2,7 +2,20 @@ package software.kanunnikoff.izhitsa
 
 import java.util.Locale
 
+/**
+ * Формирует подсказки для незавершённого слова, набираемого пользователем.
+ *
+ * Объект не хранит состояние: источник слов передаётся через [SuggestionDictionary],
+ * что позволяет одинаково использовать алгоритм в службе и модульных проверках.
+ */
 internal object SuggestionEngine {
+    /**
+     * Возвращает подсказки для слова непосредственно перед курсором.
+     *
+     * @param textBeforeCursor текст редактора перед курсором.
+     * @param composingText слово, которое метод ввода ещё не закрепил.
+     * @param dictionary источник словарных вариантов.
+     */
     fun suggestionsFor(
         textBeforeCursor: CharSequence?,
         composingText: CharSequence?,
@@ -28,6 +41,12 @@ internal object SuggestionEngine {
             .take(SuggestionCount)
     }
 
+    /**
+     * Определяет текущее слово с учётом активной составной области метода ввода.
+     *
+     * @param textBeforeCursor текст редактора перед курсором.
+     * @param composingText незавершённое слово метода ввода.
+     */
     fun resolveCurrentWord(
         textBeforeCursor: CharSequence?,
         composingText: CharSequence?
@@ -38,6 +57,11 @@ internal object SuggestionEngine {
             ?: extractCurrentWord(textBeforeCursor)
     }
 
+    /**
+     * Извлекает последнюю непрерывную последовательность букв из текста перед курсором.
+     *
+     * @param textBeforeCursor текст редактора перед курсором.
+     */
     fun extractCurrentWord(textBeforeCursor: CharSequence?): String {
         return textBeforeCursor
             ?.toString()
@@ -52,6 +76,14 @@ internal object SuggestionEngine {
     private val RussianLocale = Locale.forLanguageTag("ru-RU")
 }
 
+/**
+ * Применяет требуемый регистр к подсказкам, не меняя их порядок.
+ *
+ * @receiver исходные словарные варианты.
+ * @param letterCase режим регистра клавиатуры.
+ * @param currentWord уже набранная часть слова, по которой сохраняется начальная прописная.
+ * @param locale языковые правила преобразования регистра.
+ */
 internal fun List<String>.withSuggestionLetterCase(
     letterCase: SuggestionLetterCase,
     currentWord: CharSequence?,
@@ -86,8 +118,14 @@ internal fun List<String>.withSuggestionLetterCase(
     }
 }
 
+/** Режим преобразования регистра словарных подсказок. */
 internal enum class SuggestionLetterCase {
+    /** Словарное написание не изменяется. */
     UNCHANGED,
+
+    /** Прописной становится только первая буква. */
     INITIAL_UPPERCASE,
+
+    /** Все буквы преобразуются в прописные. */
     UPPERCASE
 }

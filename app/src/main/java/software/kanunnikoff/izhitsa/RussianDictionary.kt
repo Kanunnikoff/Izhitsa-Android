@@ -11,13 +11,30 @@ import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.zip.Inflater
 
+/** Источник словарных подсказок, пригодный для замены в модульных проверках. */
 internal fun interface SuggestionDictionary {
+    /**
+     * Возвращает не более [limit] слов, начинающихся с [prefix].
+     *
+     * Результат должен сохранять приоритет исходного словаря.
+     *
+     * @param prefix начало искомого слова.
+     * @param limit наибольшее число результатов.
+     */
     fun suggestions(
         prefix: String,
         limit: Int
     ): List<String>
 }
 
+/**
+ * Асинхронно загружает встроенный русский словарь и обслуживает запросы подсказок.
+ *
+ * До завершения загрузки запросы намеренно возвращают пустой список и не
+ * задерживают поток метода ввода.
+ *
+ * @property context контекст приложения для доступа к встроенному файлу.
+ */
 internal class RussianDictionary(
     private val context: Context
 ) : SuggestionDictionary {
@@ -26,6 +43,7 @@ internal class RussianDictionary(
     @Volatile
     private var storage: RussianDictionaryStorage? = null
 
+    /** Однократно запускает чтение словаря в отдельном последовательном потоке. */
     fun prepare() {
         if (!loadingStarted.compareAndSet(false, true)) {
             return
@@ -38,6 +56,12 @@ internal class RussianDictionary(
         }
     }
 
+    /**
+     * Ищет варианты в уже загруженном хранилище, не блокируя вызывающий поток.
+     *
+     * @param prefix начало искомого слова.
+     * @param limit наибольшее число результатов.
+     */
     override fun suggestions(
         prefix: String,
         limit: Int
@@ -48,6 +72,7 @@ internal class RussianDictionary(
         ).orEmpty()
     }
 
+    /** Отображает несжатый ресурс словаря в память без копирования всего файла в кучу. */
     private fun loadBundledStorage(): RussianDictionaryStorage {
         /*
          * Словарь не распаковывается целиком в кучу метода ввода. Android
@@ -78,11 +103,29 @@ internal class RussianDictionary(
     }
 }
 
+/**
+ * Выполняет поиск по двоичному словарю формата `IZHDICT2`.
+ *
+ * Индекс хранит первое слово каждого блока. Содержимое блока распаковывается
+ * только тогда, когда оно требуется для текущего запроса.
+ *
+ * @property data неизменяемое содержимое двоичного файла.
+ * @property dictionaryBlocks индекс раздела обычных слов.
+ * @property surnameBlocks индекс раздела фамилий.
+ */
 internal class RussianDictionaryStorage private constructor(
     private val data: ByteBuffer,
     private val dictionaryBlocks: List<Block>,
     private val surnameBlocks: List<Block>
 ) {
+    /**
+     * Возвращает слова и фамилии с указанным началом.
+     *
+     * Фамилии получают начальную прописную, а повторения из двух разделов удаляются.
+     *
+     * @param prefix начало искомого слова.
+     * @param limit наибольшее число результатов.
+     */
     fun suggestions(
         prefix: String,
         limit: Int
@@ -133,6 +176,13 @@ internal class RussianDictionaryStorage private constructor(
         return dictionarySuggestions + surnameSuggestions
     }
 
+    /**
+     * Последовательно читает подходящие слова, начиная с найденного индексом блока.
+     *
+     * @param blocks индекс выбранного раздела.
+     * @param query начало слова в UTF-8.
+     * @param limit наибольшее число результатов.
+     */
     private fun suggestions(
         blocks: List<Block>,
         query: ByteArray,
@@ -173,6 +223,12 @@ internal class RussianDictionaryStorage private constructor(
         return result
     }
 
+    /**
+     * Проверяет точное наличие слова в отсортированном разделе.
+     *
+     * @param word проверяемое слово.
+     * @param blocks индекс выбранного раздела.
+     */
     private fun contains(
         word: String,
         blocks: List<Block>
@@ -204,6 +260,14 @@ internal class RussianDictionaryStorage private constructor(
         return false
     }
 
+    /**
+     * Декодирует блок слов.
+     *
+     * Каждое слово хранит длину общего начала с предыдущим словом и собственный
+     * остаток, благодаря чему частые русские приставки не повторяются в файле.
+     *
+     * @param block декодируемый блок.
+     */
     private fun words(block: Block): List<ByteArray> {
         val payload = ByteArray(block.storedLength)
         val source = data.duplicate().order(ByteOrder.LITTLE_ENDIAN)
@@ -248,6 +312,12 @@ internal class RussianDictionaryStorage private constructor(
         return result
     }
 
+    /**
+     * Двоичным поиском находит последний блок, начинающийся не позже [query].
+     *
+     * @param query искомая байтовая строка.
+     * @param blocks индекс выбранного раздела.
+     */
     private fun blockIndexAtOrBefore(
         query: ByteArray,
         blocks: List<Block>
@@ -268,6 +338,12 @@ internal class RussianDictionaryStorage private constructor(
         return (lowerBound - 1).coerceAtLeast(0)
     }
 
+    /**
+     * Распаковывает блок и проверяет ожидаемый размер результата.
+     *
+     * @param compressed сжатое содержимое.
+     * @param expectedLength ожидаемый размер после распаковки.
+     */
     private fun inflate(
         compressed: ByteArray,
         expectedLength: Int
@@ -300,6 +376,11 @@ internal class RussianDictionaryStorage private constructor(
         private const val CodecRaw = 0
         private const val CodecDeflate = 1
 
+        /**
+         * Проверяет заголовок и строит представление словаря поверх [buffer].
+         *
+         * @param buffer содержимое двоичного словаря.
+         */
         fun parse(buffer: ByteBuffer): RussianDictionaryStorage {
             val data = buffer
                 .asReadOnlyBuffer()
@@ -342,6 +423,12 @@ internal class RussianDictionaryStorage private constructor(
             )
         }
 
+        /**
+         * Читает индекс блоков одного раздела, не затрагивая их содержимое.
+         *
+         * @param data содержимое двоичного словаря.
+         * @param descriptor положение и размер раздела.
+         */
         private fun parseBlocks(
             data: ByteBuffer,
             descriptor: SectionDescriptor
@@ -367,6 +454,12 @@ internal class RussianDictionaryStorage private constructor(
             }
         }
 
+        /**
+         * Сравнивает байтовые строки как беззнаковые последовательности UTF-8.
+         *
+         * @param first первая последовательность.
+         * @param second вторая последовательность.
+         */
         private fun compareUnsigned(
             first: ByteArray,
             second: ByteArray
@@ -385,6 +478,12 @@ internal class RussianDictionaryStorage private constructor(
             return first.size - second.size
         }
 
+        /**
+         * Проверяет байтовый префикс без промежуточного преобразования в строку.
+         *
+         * @receiver проверяемая последовательность.
+         * @param prefix ожидаемое начало.
+         */
         private fun ByteArray.startsWith(prefix: ByteArray): Boolean {
             if (size < prefix.size) {
                 return false
@@ -396,12 +495,29 @@ internal class RussianDictionaryStorage private constructor(
         }
     }
 
+    /**
+     * Описывает положение индекса одного логического раздела файла.
+     *
+     * @property identifier номер раздела.
+     * @property blockCount число блоков.
+     * @property indexOffset смещение индекса в файле.
+     */
     private data class SectionDescriptor(
         val identifier: Int,
         val blockCount: Int,
         val indexOffset: Int
     )
 
+    /**
+     * Описывает сжатое содержимое одного диапазона отсортированных слов.
+     *
+     * @property firstWord первое слово блока.
+     * @property payloadOffset смещение содержимого в файле.
+     * @property storedLength сохранённый размер.
+     * @property uncompressedLength размер после распаковки.
+     * @property wordCount число слов.
+     * @property codec способ хранения.
+     */
     private data class Block(
         val firstWord: ByteArray,
         val payloadOffset: Int,
@@ -412,11 +528,17 @@ internal class RussianDictionaryStorage private constructor(
     )
 }
 
+/**
+ * Последовательно читает целые числа и байтовые диапазоны из декодированного блока.
+ *
+ * @property bytes содержимое блока.
+ */
 private class ByteArrayCursor(
     private val bytes: ByteArray
 ) {
     private var offset = 0
 
+    /** Читает беззнаковое целое в формате с семью полезными битами на байт. */
     fun readVariableLengthInteger(): Int {
         var value = 0
         var shift = 0
@@ -441,6 +563,13 @@ private class ByteArrayCursor(
         }
     }
 
+    /**
+     * Копирует следующие [length] байт в [destination] и сдвигает курсор.
+     *
+     * @param destination массив-получатель.
+     * @param destinationOffset начальная позиция записи.
+     * @param length число копируемых байт.
+     */
     fun readInto(
         destination: ByteArray,
         destinationOffset: Int,

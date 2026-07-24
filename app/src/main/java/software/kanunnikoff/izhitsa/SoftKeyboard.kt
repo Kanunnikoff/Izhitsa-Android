@@ -43,7 +43,16 @@ import software.kanunnikoff.izhitsa.stickers.StickerContentSender
 import software.kanunnikoff.izhitsa.stickers.StickerRepository
 import java.util.Locale
 
+/**
+ * Основная служба метода ввода «Ижица».
+ *
+ * Служба связывает редактор Android через [InputConnection] с интерфейсом
+ * Compose, управляет раскладками и регистром, формирует подсказки, предоставляет
+ * панели эмодзи, стикеров и буфера обмена и воспроизводит обратную связь.
+ */
 class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, SavedStateRegistryOwner {
+    // Состояние редактора хранится отдельно от наблюдаемого состояния интерфейса:
+    // первое описывает протокол InputConnection, второе вызывает перерисовку Compose.
     private lateinit var russianDictionary: RussianDictionary
     private val composingText = StringBuilder()
     private var completions: Array<CompletionInfo>? = null
@@ -85,6 +94,7 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
     override val savedStateRegistry: SavedStateRegistry
         get() = savedStateRegistryController.savedStateRegistry
 
+    /** Создаёт зависимости службы и переводит владельцев Compose в состояние `CREATED`. */
     override fun onCreate() {
         super.onCreate()
 
@@ -108,6 +118,7 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
     }
 
+    /** Завершает жизненный цикл Compose и освобождает созданные им модели представления. */
     override fun onDestroy() {
         if (lifecycleRegistry.currentState == Lifecycle.State.RESUMED) {
             lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
@@ -123,6 +134,7 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         super.onDestroy()
     }
 
+    /** Синхронизирует жизненный цикл Compose с появлением окна клавиатуры. */
     override fun onWindowShown() {
         super.onWindowShown()
 
@@ -135,6 +147,7 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         }
     }
 
+    /** Приостанавливает Compose, когда окно метода ввода скрывается. */
     override fun onWindowHidden() {
         if (lifecycleRegistry.currentState == Lifecycle.State.RESUMED) {
             lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
@@ -147,6 +160,7 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         super.onWindowHidden()
     }
 
+    /** Создаёт корневое представление Compose и связывает его события со службой. */
     override fun onCreateInputView(): View {
         window?.window?.decorView?.let { decorView ->
             decorView.setViewTreeLifecycleOwner(this)
@@ -193,6 +207,12 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         return true
     }
 
+    /**
+     * Сбрасывает состояние предыдущего поля и выбирает раскладку по типу нового поля.
+     *
+     * @param attribute сведения о новом поле ввода.
+     * @param restarting повторно ли запускается ввод в том же поле.
+     */
     override fun onStartInput(
         attribute: EditorInfo,
         restarting: Boolean
@@ -235,6 +255,12 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         refreshTextState()
     }
 
+    /**
+     * Отмечает фактическое использование клавиатуры и перечитывает настройки отклика.
+     *
+     * @param info сведения о поле, для которого показывается клавиатура.
+     * @param restarting повторно ли показывается клавиатура для того же поля.
+     */
     override fun onStartInputView(
         info: EditorInfo,
         restarting: Boolean
@@ -247,6 +273,7 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         refreshTextState()
     }
 
+    /** Завершает составной ввод и очищает панели при уходе из поля. */
     override fun onFinishInput() {
         composingText.clear()
         completionSuggestions = emptyList()
@@ -257,6 +284,16 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         super.onFinishInput()
     }
 
+    /**
+     * Отслеживает внешнее перемещение курсора и отменяет устаревшую составную область.
+     *
+     * @param oldSelStart прежнее начало выделения.
+     * @param oldSelEnd прежний конец выделения.
+     * @param newSelStart новое начало выделения.
+     * @param newSelEnd новый конец выделения.
+     * @param candidatesStart начало составной области.
+     * @param candidatesEnd конец составной области.
+     */
     override fun onUpdateSelection(
         oldSelStart: Int,
         oldSelEnd: Int,
@@ -287,6 +324,11 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         refreshTextState()
     }
 
+    /**
+     * Принимает варианты автозаполнения, предоставленные полноэкранным редактором.
+     *
+     * @param newCompletions новые варианты либо `null`, если редактор их очистил.
+     */
     override fun onDisplayCompletions(newCompletions: Array<CompletionInfo>?) {
         if (!completionEnabled) {
             return
@@ -303,6 +345,11 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         refreshTextState()
     }
 
+    /**
+     * Настраивает подсказки и приватность для конкретной разновидности текстового поля.
+     *
+     * @param attribute сведения о поле ввода.
+     */
     private fun configureTextInput(attribute: EditorInfo) {
         baseLayout = KeyboardLayouts.Russian
         layoutMode = LayoutMode.ALPHA
@@ -330,6 +377,12 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         publishLayout(baseLayout)
     }
 
+    /**
+     * Направляет событие клавиши подходящему обработчику и обновляет подсказки.
+     *
+     * @param key нажатая клавиша текущей раскладки.
+     * @return `true`, если событие обработано службой.
+     */
     private fun onKey(key: KeyInfo): Boolean {
         performKeyFeedback()
 
@@ -384,12 +437,23 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         return handled
     }
 
+    /**
+     * Выполняет отдельное действие, выбранное в меню долгого нажатия.
+     *
+     * @param action выбранное действие.
+     */
     private fun handleKeyLongPressAction(action: KeyLongPressAction) {
         when (action) {
             KeyLongPressAction.SHOW_EMOJI -> currentPanel.value = KeyboardPanel.EMOJI
         }
     }
 
+    /**
+     * Вставляет явно выбранный альтернативный символ.
+     *
+     * @param key исходная клавиша.
+     * @param alternative выбранный символ.
+     */
     private fun onAlternativeSelected(
         key: KeyInfo,
         alternative: String
@@ -414,6 +478,11 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         refreshTextState()
     }
 
+    /**
+     * Вставляет печатаемую клавишу и поддерживает последовательный перебор её вариантов.
+     *
+     * @param key нажатая печатаемая клавиша.
+     */
     private fun handleCharacter(key: KeyInfo) {
         val label = key.label ?: key.code.toChar().toString()
         val now = System.currentTimeMillis()
@@ -465,6 +534,12 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         }
     }
 
+    /**
+     * Передаёт [text] редактору как составной либо окончательно закреплённый текст.
+     *
+     * @param text вставляемый текст.
+     * @param useComposingRegion передавать ли текст как незавершённое слово.
+     */
     private fun insertText(
         text: String,
         useComposingRegion: Boolean
@@ -486,6 +561,12 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         }
     }
 
+    /**
+     * Заменяет последний введённый вариант при повторном коротком нажатии клавиши.
+     *
+     * @param previousText ранее вставленный вариант.
+     * @param replacementText следующий вариант.
+     */
     private fun replaceLastInput(
         previousText: String,
         replacementText: String
@@ -508,6 +589,11 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         }
     }
 
+    /**
+     * Закрепляет составное слово и вставляет готовую строку из вспомогательной панели.
+     *
+     * @param text строка эмодзи, реакции или буфера обмена.
+     */
     private fun commitDirectText(text: String) {
         val inputConnection = currentInputConnection ?: return
 
@@ -518,6 +604,11 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         refreshTextState()
     }
 
+    /**
+     * Передаёт выбранный стикер, если поле объявило поддержку изображений.
+     *
+     * @param sticker выбранный элемент каталога.
+     */
     private fun commitSticker(sticker: Sticker) {
         if (!supportsStickerContent) {
             return
@@ -533,6 +624,11 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         )
     }
 
+    /**
+     * Заменяет текущее слово выбранной словарной подсказкой и добавляет пробел.
+     *
+     * @param suggestion выбранный словарный вариант.
+     */
     private fun commitSuggestion(suggestion: String) {
         val inputConnection = currentInputConnection ?: return
         val completionIndex = currentSuggestions.value.indexOf(suggestion)
@@ -584,6 +680,11 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         refreshTextState()
     }
 
+    /**
+     * Закрепляет накопленную составную область в редакторе.
+     *
+     * @param inputConnection соединение с текущим полем.
+     */
     private fun commitTyped(inputConnection: InputConnection) {
         if (composingText.isEmpty()) {
             return
@@ -593,6 +694,11 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         composingText.clear()
     }
 
+    /**
+     * Удаляет выделение, последнюю кодовую точку составного текста или символ перед курсором.
+     *
+     * @return `true`, если редактор действительно был изменён.
+     */
     private fun handleBackspace(): Boolean {
         val inputConnection = currentInputConnection ?: return false
         alternativeTap = null
@@ -633,6 +739,7 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         return deleted
     }
 
+    /** Переключает обычный, одноразовый верхний регистр и Caps Lock. */
     private fun handleShift() {
         if (layoutMode != LayoutMode.ALPHA) {
             return
@@ -665,6 +772,7 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         publishCurrentMode()
     }
 
+    /** Согласует одноразовый верхний регистр с правилами текущего редактора. */
     private fun updateAutomaticShift() {
         if (
             layoutMode != LayoutMode.ALPHA ||
@@ -688,6 +796,7 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         }
     }
 
+    /** Возвращает выбранную буквенную раскладку. */
     private fun showAlphabetLayout() {
         layoutMode = LayoutMode.ALPHA
         shiftState = ShiftState.OFF
@@ -696,6 +805,7 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         updateAutomaticShift()
     }
 
+    /** Открывает первую страницу символов. */
     private fun showSymbolsLayout() {
         layoutMode = LayoutMode.SYMBOLS1
         shiftState = ShiftState.OFF
@@ -703,6 +813,7 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         publishLayout(KeyboardLayouts.Symbols)
     }
 
+    /** Открывает вторую страницу символов только с первой страницы. */
     private fun showMoreSymbolsLayout() {
         if (layoutMode != LayoutMode.SYMBOLS1) {
             return
@@ -713,6 +824,7 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         publishLayout(KeyboardLayouts.Symbols2)
     }
 
+    /** Открывает цифровую раскладку. */
     private fun showNumberPadLayout() {
         layoutMode = LayoutMode.NUMBERS
         shiftState = ShiftState.OFF
@@ -720,6 +832,7 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         publishLayout(KeyboardLayouts.Numbers)
     }
 
+    /** Переключает русскую и английскую буквенные раскладки. */
     private fun switchLanguage() {
         baseLayout = if (baseLayout == KeyboardLayouts.Russian) {
             KeyboardLayouts.English
@@ -734,6 +847,7 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         updateAutomaticShift()
     }
 
+    /** Публикует раскладку, соответствующую текущему режиму. */
     private fun publishCurrentMode() {
         val layout = when (layoutMode) {
             LayoutMode.ALPHA -> baseLayout
@@ -745,6 +859,11 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         publishLayout(layout)
     }
 
+    /**
+     * Применяет регистр и действие редактора перед передачей раскладки в Compose.
+     *
+     * @param layout исходная раскладка выбранного режима.
+     */
     private fun publishLayout(layout: List<List<KeyInfo>>) {
         val withCaps = applyCaps(
             layout = layout,
@@ -753,6 +872,12 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         currentLayout.value = applyEditorAction(layout = withCaps)
     }
 
+    /**
+     * Преобразует буквы и их альтернативы в требуемый регистр.
+     *
+     * @param layout исходные ряды клавиш.
+     * @param enabled использовать ли верхний регистр.
+     */
     private fun applyCaps(
         layout: List<List<KeyInfo>>,
         enabled: Boolean
@@ -803,6 +928,11 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         }
     }
 
+    /**
+     * Настраивает Enter по действию, которое запросило текущее поле ввода.
+     *
+     * @param layout раскладка с исходным Enter.
+     */
     private fun applyEditorAction(layout: List<List<KeyInfo>>): List<List<KeyInfo>> {
         val editorInfo = currentInputEditorInfo ?: return layout
         val action = editorInfo.imeOptions and EditorInfo.IME_MASK_ACTION
@@ -848,6 +978,11 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         }
     }
 
+    /**
+     * Вставляет печатаемый код либо передаёт Enter специальному обработчику.
+     *
+     * @param keyCode код печатаемого символа или Enter.
+     */
     private fun sendKey(keyCode: Int) {
         if (keyCode == KeyboardKeyCodes.ENTER) {
             sendEditorAction()
@@ -857,6 +992,7 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         currentInputConnection?.commitText(keyCode.toChar().toString(), 1)
     }
 
+    /** Выполняет заявленное действие редактора или отправляет обычный Enter. */
     private fun sendEditorAction() {
         val inputConnection = currentInputConnection ?: return
         val editorInfo = currentInputEditorInfo
@@ -877,6 +1013,11 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         }
     }
 
+    /**
+     * Отправляет редактору законченную пару событий нажатия аппаратной клавиши.
+     *
+     * @param keyEventCode код аппаратной клавиши Android.
+     */
     private fun keyDownUp(keyEventCode: Int) {
         val inputConnection = currentInputConnection ?: return
 
@@ -894,6 +1035,7 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         )
     }
 
+    /** Перечитывает контекст перед курсором и публикует подходящие подсказки. */
     private fun refreshTextState() {
         val inputConnection = currentInputConnection
 
@@ -948,6 +1090,11 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         )
     }
 
+    /**
+     * Переключает панели или выполняет действие верхней строки клавиатуры.
+     *
+     * @param action выбранное действие.
+     */
     private fun handleToolbarAction(action: KeyboardToolbarAction) {
         when (action) {
             KeyboardToolbarAction.OPEN_ACTIONS -> {
@@ -975,6 +1122,7 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         }
     }
 
+    /** Открывает системное меню отправки ссылки на страницу приложения. */
     private fun shareApplication() {
         currentPanel.value = KeyboardPanel.KEYS
         startActivity(
@@ -982,6 +1130,7 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         )
     }
 
+    /** Читает первый текстовый элемент буфера обмена с ограничением безопасной длины. */
     private fun refreshClipboardText() {
         val clipboardManager = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         val primaryClip = clipboardManager.primaryClip
@@ -1000,6 +1149,7 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         }
     }
 
+    /** Открывает системный список клавиатур из контекста службы. */
     private fun openInputMethodSettings() {
         /*
          * Настройки открываются отдельной задачей, потому что метод ввода является
@@ -1012,10 +1162,12 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         startActivity(intent)
     }
 
+    /** Закрывает вспомогательную панель и возвращается к клавишам. */
     private fun showLettersPanel() {
         currentPanel.value = KeyboardPanel.KEYS
     }
 
+    /** Перечитывает параметры звука и вибрации, общие с главным окном. */
     private fun refreshFeedbackPreferences() {
         isKeyboardSoundFeedbackEnabled =
             preferences.isKeyboardSoundFeedbackEnabled
@@ -1023,6 +1175,7 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
             preferences.isKeyboardHapticFeedbackEnabled
     }
 
+    /** Воспроизводит разрешённые пользователем звук и вибрацию нажатия. */
     private fun performKeyFeedback() {
         if (isKeyboardSoundFeedbackEnabled) {
             audioManager.playSoundEffect(AudioManager.FX_KEYPRESS_STANDARD)
@@ -1038,6 +1191,7 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         vibrator.vibrate(createKeyVibrationEffect())
     }
 
+    /** Создаёт наиболее точный доступный на устройстве короткий вибрационный отклик. */
     private fun createKeyVibrationEffect(): VibrationEffect {
         /*
          * На Android 11 и новее композиция позволяет масштабировать системный
@@ -1072,30 +1226,39 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
         }
     }
 
+    /**
+     * Проверяет, завершает ли код текущее слово.
+     *
+     * @param code код клавиши.
+     */
     private fun isWordSeparator(code: Int): Boolean {
         return code > 0 && wordSeparators.contains(code.toChar())
     }
 
-    fun pickSuggestionManually(index: Int) {
-        currentSuggestions.value
-            .getOrNull(index)
-            ?.let(::commitSuggestion)
-    }
-
+    /**
+     * Состояние перебора вариантов повторными короткими нажатиями.
+     *
+     * @property keyCode код клавиши, варианты которой перебираются.
+     * @property alternativeIndex индекс последнего вставленного варианта.
+     * @property timestampMillis время последнего нажатия.
+     */
     private data class AlternativeTap(
         val keyCode: Int,
         val alternativeIndex: Int,
         val timestampMillis: Long
     )
 
+    /** Состояния регистра буквенной раскладки. */
     private enum class ShiftState {
         OFF,
         ONESHOT,
         CAPS_LOCK;
 
+        /** Нужно ли сейчас показывать и вводить прописные буквы. */
         val isCapsEnabled: Boolean
             get() = this != OFF
 
+        /** Регистр, который следует применить к словарным подсказкам. */
         val suggestionLetterCase: SuggestionLetterCase
             get() = when (this) {
                 OFF -> SuggestionLetterCase.UNCHANGED
@@ -1104,6 +1267,7 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
             }
     }
 
+    /** Логические страницы клавиатуры. */
     private enum class LayoutMode {
         ALPHA,
         SYMBOLS1,
@@ -1124,6 +1288,13 @@ class SoftKeyboard : InputMethodService(), LifecycleOwner, ViewModelStoreOwner, 
     }
 }
 
+/**
+ * Решает, безопасно ли хранить незавершённое слово в составной области редактора.
+ *
+ * @param sdkInt версия Android, передаваемая отдельно для воспроизводимой проверки.
+ * @param predictionEnabled разрешены ли подсказки для текущего поля.
+ * @param inputClass основной класс поля ввода.
+ */
 internal fun shouldUseComposingRegion(
     sdkInt: Int,
     predictionEnabled: Boolean,
@@ -1140,6 +1311,13 @@ internal fun shouldUseComposingRegion(
         inputClass == InputType.TYPE_CLASS_TEXT
 }
 
+/**
+ * Создаёт системное меню отправки ссылки на приложение в Google Play.
+ *
+ * Результат уже содержит флаг новой задачи, обязательный для запуска из службы.
+ *
+ * @param packageName имя пакета приложения.
+ */
 internal fun createShareApplicationIntent(packageName: String): Intent {
     val shareIntent = Intent(Intent.ACTION_SEND).apply {
         type = PlainTextMimeType

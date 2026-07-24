@@ -17,6 +17,9 @@ import java.io.IOException
 
 /**
  * Управляет покупкой расходуемых чаевых через Google Play.
+ *
+ * @property activity окно, из которого открывается системная оплата.
+ * @property billingUpdatesListener получатель состояния платёжного процесса.
  */
 class BillingManager(
     private val activity: Activity,
@@ -41,6 +44,7 @@ class BillingManager(
         startServiceConnection()
     }
 
+    /** Загружает сведения о чаевых и открывает системное окно разовой покупки. */
     fun initiateTipsPurchase() {
         if (!isBillingAvailable || !billingClient.isReady) {
             Log.w(TAG, "Платёжная служба недоступна.")
@@ -106,6 +110,12 @@ class BillingManager(
         }
     }
 
+    /**
+     * Принимает итог системного окна оплаты и направляет покупки на проверку.
+     *
+     * @param billingResult результат операции Google Play.
+     * @param purchases возвращённые покупки либо `null`.
+     */
     override fun onPurchasesUpdated(
         billingResult: BillingResult,
         purchases: List<Purchase>?
@@ -153,6 +163,11 @@ class BillingManager(
         }
     }
 
+    /**
+     * Проверяет подпись и состояние покупки перед её погашением.
+     *
+     * @param purchase проверяемая покупка.
+     */
     private fun handleTipsPurchase(purchase: Purchase) {
         if (!verifyValidSignature(purchase.originalJson, purchase.signature)) {
             Log.e(TAG, "Подпись покупки чаевых недействительна.")
@@ -179,6 +194,13 @@ class BillingManager(
         }
     }
 
+    /**
+     * Погашает расходуемую покупку, чтобы чаевые можно было приобрести повторно.
+     *
+     * Набор [purchaseTokensBeingConsumed] защищает один токен от параллельных запросов.
+     *
+     * @param purchase подтверждённая покупка.
+     */
     private fun consumeTipsPurchase(purchase: Purchase) {
         val purchaseToken = purchase.purchaseToken
         if (!purchaseTokensBeingConsumed.add(purchaseToken)) {
@@ -208,6 +230,11 @@ class BillingManager(
         }
     }
 
+    /**
+     * Находит ранее оплаченные, но ещё не погашенные чаевые.
+     *
+     * @param notifyAboutError сообщать ли слушателю об ошибке или пустом результате.
+     */
     private fun queryTipsPurchases(notifyAboutError: Boolean) {
         val queryParams = QueryPurchasesParams.newBuilder()
             .setProductType(BillingClient.ProductType.INAPP)
@@ -242,8 +269,14 @@ class BillingManager(
         }
     }
 
+    /** Устанавливает соединение с Google Play и восстанавливает незавершённые покупки. */
     private fun startServiceConnection() {
         billingClient.startConnection(object : BillingClientStateListener {
+            /**
+             * Сохраняет доступность платежей и запускает восстановление покупок.
+             *
+             * @param billingResult результат настройки клиента.
+             */
             override fun onBillingSetupFinished(billingResult: BillingResult) {
                 isBillingAvailable =
                     billingResult.responseCode == BillingClient.BillingResponseCode.OK
@@ -259,6 +292,7 @@ class BillingManager(
                 }
             }
 
+            /** Отмечает разрыв; автоматическое переподключение выполнит библиотека. */
             override fun onBillingServiceDisconnected() {
                 isBillingAvailable = false
                 Log.w(
@@ -269,11 +303,18 @@ class BillingManager(
         })
     }
 
+    /** Освобождает соединение с Google Play; вызывается при уничтожении окна. */
     fun destroy() {
         purchaseTokensBeingConsumed.clear()
         billingClient.endConnection()
     }
 
+    /**
+     * Проверяет криптографическую подпись ответа Google Play открытым ключом приложения.
+     *
+     * @param signedData исходные подписанные данные покупки.
+     * @param signature подпись в Base64.
+     */
     private fun verifyValidSignature(signedData: String, signature: String): Boolean {
         return try {
             Security.verifyPurchase(BASE_64_ENCODED_PUBLIC_KEY, signedData, signature)
@@ -287,18 +328,28 @@ class BillingManager(
         }
     }
 
+    /** Получает изменения состояния платёжного процесса для отображения в интерфейсе. */
     interface BillingUpdatesListener {
+        /** Вызывается после успешной подготовки платёжного клиента. */
         fun onBillingClientSetupFinished()
 
+        /**
+         * Сообщает об успешно проверенных и погашенных чаевых.
+         *
+         * @param purchase подтверждённая покупка.
+         * @param productDetails сведения о цене либо `null`, если они уже недоступны.
+         */
         fun onTipsPurchased(
             purchase: Purchase,
             productDetails: ProductDetails?
         )
 
+        /** Сообщает об ошибке, которую нужно показать пользователю. */
         fun onBillingError()
     }
 
     companion object {
+        /** Идентификатор расходуемых чаевых в Google Play. */
         const val TIPS_PRODUCT_ID = "tips"
 
         private const val TAG = "BillingManager"

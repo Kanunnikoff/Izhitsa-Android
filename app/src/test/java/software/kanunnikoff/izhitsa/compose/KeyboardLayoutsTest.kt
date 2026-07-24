@@ -6,7 +6,9 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/** Проверяет содержимое раскладок и доступность вариантов долгого нажатия. */
 class KeyboardLayoutsTest {
+    /** Буквенные раскладки открывают эмодзи удержанием запятой. */
     @Test
     fun `буквенные раскладки открывают эмодзи долгим удержанием запятой`() {
         val layouts = listOf(
@@ -25,6 +27,7 @@ class KeyboardLayoutsTest {
         }
     }
 
+    /** Символьная запятая остаётся обычным знаком без действия эмодзи. */
     @Test
     fun `на символьной раскладке запятая не содержит эмодзи`() {
         val commaKey = KeyboardLayouts.Symbols
@@ -35,6 +38,7 @@ class KeyboardLayoutsTest {
         assertNull(commaKey.longPressAction)
     }
 
+    /** Эмодзи не занимают отдельную клавишу ни в одной основной раскладке. */
     @Test
     fun `в раскладках нет отдельной клавиши эмодзи`() {
         val layouts = listOf(
@@ -53,6 +57,7 @@ class KeyboardLayoutsTest {
         }
     }
 
+    /** Русский пробел использует историческое написание названия языка. */
     @Test
     fun `русская клавиша пробела подписана в дореформенной орфографии`() {
         val spaceKey = KeyboardLayouts.Russian
@@ -62,6 +67,7 @@ class KeyboardLayoutsTest {
         assertEquals("Русскій", spaceKey.label)
     }
 
+    /** Цифры верхнего ряда доступны удержанием соответствующих букв. */
     @Test
     fun `цифровые подсказки верхнего ряда доступны по удержанию в буквенных раскладках`() {
         val alphabeticLayouts = listOf(
@@ -88,6 +94,7 @@ class KeyboardLayoutsTest {
         }
     }
 
+    /** Каждая русская гласная содержит вариант с комбинируемым ударением. */
     @Test
     fun `все русские гласные содержат вариант под ударением`() {
         val combiningAcuteAccent = "\u0301"
@@ -103,6 +110,7 @@ class KeyboardLayoutsTest {
         }
     }
 
+    /** Вариант клавиши «и» содержит кириллическую, а не латинскую букву. */
     @Test
     fun `клавиша и содержит кириллическую і десятеричную`() {
         val iKey = KeyboardLayouts.Russian
@@ -115,6 +123,7 @@ class KeyboardLayoutsTest {
         assertFalse(iKey.tapAlternatives.contains("i"))
     }
 
+    /** Удержание удаления включено во всех раскладках. */
     @Test
     fun `удержание Backspace повторяется во всех раскладках`() {
         val layouts = listOf(
@@ -134,6 +143,7 @@ class KeyboardLayoutsTest {
         }
     }
 
+    /** Меню точки совпадает с принятой двухрядной геометрией и порядком знаков. */
     @Test
     fun `точка содержит двухрядную панель знаков Gboard`() {
         val expectedAlternatives = listOf(
@@ -157,6 +167,7 @@ class KeyboardLayoutsTest {
         }
     }
 
+    /** Обе символьные страницы содержат дополнительные валютные и типографские знаки. */
     @Test
     fun `символьные панели содержат эталонные дополнительные знаки`() {
         val firstSymbols = KeyboardLayouts.Symbols

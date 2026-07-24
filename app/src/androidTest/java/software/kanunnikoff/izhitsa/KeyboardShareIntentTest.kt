@@ -8,9 +8,11 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
+/** Проверяет системное меню отправки, создаваемое службой клавиатуры. */
 @RunWith(AndroidJUnit4::class)
 class KeyboardShareIntentTest {
 
+    /** Вложенное намерение содержит ссылку Google Play и правильный тип текста. */
     @Suppress("DEPRECATION")
     @Test
     fun shareIntentContainsApplicationPageLink() {

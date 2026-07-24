@@ -45,7 +45,6 @@ dependencies {
     
     implementation(libs.androidx.appcompat)
     implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.constraintlayout)
     implementation(libs.google.material)
     implementation(libs.billing.client)
     implementation(libs.play.review)

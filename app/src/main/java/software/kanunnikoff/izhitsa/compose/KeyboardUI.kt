@@ -107,6 +107,25 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.roundToInt
 import androidx.emoji2.emojipicker.R as EmojiPickerResources
 
+/**
+ * Полное описание одной клавиши, независимое от способа её отрисовки.
+ *
+ * @property code код символа либо отрицательный служебный код.
+ * @property label основная надпись.
+ * @property icon значок вместо надписи.
+ * @property hint дополнительная надпись в углу.
+ * @property hintIcon дополнительный значок в углу.
+ * @property alternatives пункты меню долгого нажатия.
+ * @property tapAlternatives варианты, перебираемые повторными короткими нажатиями.
+ * @property alternativeRowLengths распределение пунктов меню по строкам.
+ * @property preferredAlternativeIndex пункт, совмещаемый с удерживаемой клавишей.
+ * @property longPressAction отдельное действие в меню долгого нажатия.
+ * @property weight доля доступной ширины ряда.
+ * @property fontSize явно заданный размер надписи.
+ * @property isModifier признак служебной клавиши.
+ * @property isActive признак включённого состояния служебной клавиши.
+ * @property repeatOnLongPress следует ли повторять действие при удержании.
+ */
 data class KeyInfo(
     val code: Int,
     val label: String? = null,
@@ -125,10 +144,12 @@ data class KeyInfo(
     val repeatOnLongPress: Boolean = false
 )
 
+/** Действия долгого нажатия, которые не сводятся к выбору символа. */
 enum class KeyLongPressAction {
     SHOW_EMOJI
 }
 
+/** Взаимоисключающие панели внутри окна метода ввода. */
 enum class KeyboardPanel {
     KEYS,
     ACTIONS,
@@ -137,6 +158,7 @@ enum class KeyboardPanel {
     CLIPBOARD
 }
 
+/** События верхней панели, обрабатываемые службой клавиатуры. */
 enum class KeyboardToolbarAction {
     OPEN_ACTIONS,
     SHARE_APP,
@@ -147,6 +169,29 @@ enum class KeyboardToolbarAction {
     SETTINGS
 }
 
+/**
+ * Корневой интерфейс клавиатуры.
+ *
+ * Компонент только отображает переданное состояние и сообщает о действиях;
+ * изменение раскладки и ввод текста остаются ответственностью службы.
+ *
+ * @param rows ряды клавиш текущей раскладки.
+ * @param isNumberLayout используется ли специальная геометрия цифровой раскладки.
+ * @param panel открытая панель клавиатуры.
+ * @param suggestions словарные варианты для верхней строки.
+ * @param clipboardText доступный для вставки текст из буфера обмена.
+ * @param supportsStickerContent принимает ли текущее поле изображения.
+ * @param isHapticFeedbackEnabled разрешён ли отклик при удержании клавиши.
+ * @param onKeyClick обработчик короткого нажатия; возвращает признак обработки.
+ * @param onKeyLongPressAction обработчик самостоятельного действия удержания.
+ * @param onAlternativeSelected обработчик выбора альтернативного символа.
+ * @param onSuggestionClick обработчик выбора словарного варианта.
+ * @param onToolbarAction обработчик действия верхней панели.
+ * @param onEmojiPicked обработчик выбранного эмодзи.
+ * @param onReactionPicked обработчик текста из вспомогательной панели.
+ * @param onStickerPicked обработчик выбранного стикера.
+ * @param onClosePanel обработчик возврата к основной раскладке.
+ */
 @Composable
 fun KeyboardScreen(
     rows: List<List<KeyInfo>>,
@@ -319,6 +364,7 @@ fun KeyboardScreen(
     }
 }
 
+/** Вычисляет нижний отступ клавиатуры с учётом вида системной навигации. */
 @Suppress("DiscouragedApi")
 @Composable
 private fun keyboardBottomInset(): Dp {
@@ -356,6 +402,14 @@ private fun keyboardBottomInset(): Dp {
     return maxOf(navigationBarInset, navigationAreaHeight) + KeyboardNavigationContentGap
 }
 
+/**
+ * Показывает словарные подсказки либо основные действия клавиатуры.
+ *
+ * @param suggestions варианты для отображения в порядке приоритета.
+ * @param palette цвета текущей темы клавиатуры.
+ * @param onSuggestionClick обработчик выбора варианта.
+ * @param onToolbarAction обработчик нажатия служебной кнопки.
+ */
 @Composable
 private fun KeyboardToolbar(
     suggestions: List<String>,
@@ -436,6 +490,13 @@ private fun KeyboardToolbar(
     }
 }
 
+/**
+ * Верхняя строка расширенной панели действий.
+ *
+ * @param palette цвета текущей темы клавиатуры.
+ * @param onBack обработчик возврата к клавишам.
+ * @param onToolbarAction обработчик выбора доступной панели.
+ */
 @Composable
 private fun ActionsPanelToolbar(
     palette: KeyboardPalette,
@@ -479,6 +540,12 @@ private fun ActionsPanelToolbar(
     }
 }
 
+/**
+ * Показывает крупные карточки редко используемых действий.
+ *
+ * @param palette цвета текущей темы клавиатуры.
+ * @param onToolbarAction обработчик выбранной карточки.
+ */
 @Composable
 private fun ActionsPanel(
     palette: KeyboardPalette,
@@ -551,6 +618,14 @@ private fun ActionsPanel(
     }
 }
 
+/**
+ * Стандартная кнопка верхней панели.
+ *
+ * @param imageVector векторный значок кнопки.
+ * @param contentDescription доступное название действия.
+ * @param palette цвета текущей темы клавиатуры.
+ * @param onClick обработчик нажатия.
+ */
 @Composable
 private fun ToolbarIcon(
     imageVector: ImageVector,
@@ -571,12 +646,26 @@ private fun ToolbarIcon(
     }
 }
 
+/**
+ * Данные одной карточки расширенной панели действий.
+ *
+ * @property action событие, отправляемое службе.
+ * @property title видимая и доступная подпись.
+ * @property icon значок карточки.
+ */
 private data class KeyboardActionPanelItem(
     val action: KeyboardToolbarAction,
     val title: String,
     val icon: ImageVector
 )
 
+/**
+ * Заголовок вложенной панели с кнопкой возврата к буквам.
+ *
+ * @param title заголовок панели.
+ * @param palette цвета текущей темы клавиатуры.
+ * @param onBack обработчик возврата к основной раскладке.
+ */
 @Composable
 private fun PanelToolbar(
     title: String,
@@ -607,6 +696,17 @@ private fun PanelToolbar(
     }
 }
 
+/**
+ * Отображает обычные буквенные и символьные ряды.
+ *
+ * @param rows ряды текущей раскладки.
+ * @param palette цвета текущей темы клавиатуры.
+ * @param isHapticFeedbackEnabled разрешён ли отклик при удержании.
+ * @param onKeyClick обработчик короткого нажатия.
+ * @param onKeyLongPressAction обработчик самостоятельного действия удержания.
+ * @param onAlternativeSelected обработчик альтернативного символа и его клавиши.
+ * @param onAlternativeMenuVisibilityChanged обработчик видимости всплывающего меню.
+ */
 @Composable
 private fun KeyboardRows(
     rows: List<List<KeyInfo>>,
@@ -656,6 +756,17 @@ private fun KeyboardRows(
     }
 }
 
+/**
+ * Раскладывает цифровые клавиши в сетку с двумя боковыми колонками.
+ *
+ * @param rows строки модели цифровой раскладки.
+ * @param palette цвета текущей темы клавиатуры.
+ * @param isHapticFeedbackEnabled разрешён ли отклик при удержании.
+ * @param onKeyClick обработчик короткого нажатия.
+ * @param onKeyLongPressAction обработчик самостоятельного действия удержания.
+ * @param onAlternativeSelected обработчик альтернативного символа и его клавиши.
+ * @param onAlternativeMenuVisibilityChanged обработчик видимости всплывающего меню.
+ */
 @Composable
 private fun NumberKeyboardRows(
     rows: List<List<KeyInfo>>,
@@ -781,6 +892,14 @@ private fun NumberKeyboardRows(
     }
 }
 
+/**
+ * Отображает объединённую колонку арифметических операций.
+ *
+ * @param keys клавиши операций сверху вниз.
+ * @param modifier внешнее оформление и доля ширины колонки.
+ * @param palette цвета текущей темы клавиатуры.
+ * @param onKeyClick обработчик выбранной операции.
+ */
 @Composable
 private fun NumberOperatorColumn(
     keys: List<KeyInfo>,
@@ -817,6 +936,19 @@ private fun NumberOperatorColumn(
     }
 }
 
+/**
+ * Отображает одну интерактивную клавишу и распознаёт нажатие, удержание и выбор варианта.
+ *
+ * @param key модель отображаемой клавиши.
+ * @param modifier внешнее оформление и размер в ряду.
+ * @param palette цвета текущей темы клавиатуры.
+ * @param isBottomRow находится ли клавиша в нижнем ряду.
+ * @param isHapticFeedbackEnabled разрешён ли отклик при удержании.
+ * @param onClick обработчик короткого или повторяемого нажатия.
+ * @param onLongPressAction обработчик самостоятельного действия удержания.
+ * @param onAlternativeMenuVisibilityChanged обработчик видимости меню вариантов.
+ * @param onAlternativeSelected обработчик выбранного символа.
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun KeyButton(
@@ -1045,6 +1177,12 @@ private fun KeyButton(
     }
 }
 
+/**
+ * Выбирает надпись или значок клавиши и добавляет угловую подсказку.
+ *
+ * @param key модель содержимого клавиши.
+ * @param palette цвета текущей темы клавиатуры.
+ */
 @Composable
 private fun KeyContent(
     key: KeyInfo,
@@ -1132,6 +1270,12 @@ private fun KeyContent(
     }
 }
 
+/**
+ * Рисует компактный значок цифровой раскладки без отдельного ресурса.
+ *
+ * @param color цвет цифр.
+ * @param modifier внешнее оформление значка.
+ */
 @Composable
 private fun NumberPadIcon(
     color: Color,
@@ -1167,6 +1311,12 @@ private fun NumberPadIcon(
     }
 }
 
+/**
+ * Подбирает размер надписи по назначению и длине клавиши.
+ *
+ * @receiver клавиша, для которой выбирается размер.
+ * @param label фактически отображаемая надпись.
+ */
 private fun KeyInfo.labelFontSize(label: String): TextUnit {
     return when {
         hintIcon != null -> EmojiCommaLabelFontSize
@@ -1176,10 +1326,20 @@ private fun KeyInfo.labelFontSize(label: String): TextUnit {
     }
 }
 
+/**
+ * Возвращает общее число символов и действий в меню удержания.
+ *
+ * @receiver клавиша с возможными вариантами.
+ */
 private fun KeyInfo.menuItemCount(): Int {
     return alternatives.size + if (longPressAction == null) 0 else 1
 }
 
+/**
+ * Проверяет заданное разбиение меню по строкам и при необходимости создаёт одну строку.
+ *
+ * @receiver клавиша с описанием геометрии меню.
+ */
 private fun KeyInfo.menuRowLengths(): List<Int> {
     val itemCount = menuItemCount()
     val hasValidRows = alternativeRowLengths.isNotEmpty() &&
@@ -1193,6 +1353,11 @@ private fun KeyInfo.menuRowLengths(): List<Int> {
     }
 }
 
+/**
+ * Находит вариант, который должен быть выбран сразу после открытия меню.
+ *
+ * @receiver клавиша с вариантами долгого нажатия.
+ */
 private fun KeyInfo.defaultMenuItemIndex(): Int {
     val itemCount = menuItemCount()
 
@@ -1210,6 +1375,12 @@ private fun KeyInfo.defaultMenuItemIndex(): Int {
     )
 }
 
+/**
+ * Возвращает скругление с учётом удлинённых кнопок нижнего ряда.
+ *
+ * @receiver клавиша, форму которой нужно определить.
+ * @param isBottomRow находится ли клавиша в нижнем ряду.
+ */
 private fun KeyInfo.shape(isBottomRow: Boolean): RoundedCornerShape {
     val usesPillShape = isBottomRow && (
         code == KeyboardKeyCodes.SYMBOLS ||
@@ -1226,10 +1397,20 @@ private fun KeyInfo.shape(isBottomRow: Boolean): RoundedCornerShape {
     )
 }
 
+/**
+ * Формирует название клавиши для службы специальных возможностей.
+ *
+ * @receiver описываемая клавиша.
+ */
 private fun KeyInfo.accessibilityDescription(): String {
     return label ?: icon?.contentDescription() ?: "Клавиша"
 }
 
+/**
+ * Объясняет службе специальных возможностей результат долгого нажатия.
+ *
+ * @receiver описываемая клавиша.
+ */
 private fun KeyInfo.longPressDescription(): String {
     return when {
         alternatives.isNotEmpty() -> "Показать альтернативные символы"
@@ -1239,6 +1420,16 @@ private fun KeyInfo.longPressDescription(): String {
     }
 }
 
+/**
+ * Преобразует экранные координаты указателя в индекс пункта меню альтернатив.
+ *
+ * @param key удерживаемая клавиша.
+ * @param keyBounds границы клавиши в координатах окна.
+ * @param pointerX горизонтальная координата указателя в окне.
+ * @param pointerY вертикальная координата указателя в окне.
+ * @param density плотность экрана для перевода размеров.
+ * @param screenWidthPixels доступная ширина окна в пикселях.
+ */
 private fun alternativeIndexAt(
     key: KeyInfo,
     keyBounds: Rect,
@@ -1292,6 +1483,14 @@ private fun alternativeIndexAt(
     return rowStartIndex + column
 }
 
+/**
+ * Показывает над удерживаемой клавишей меню альтернативных символов и действий.
+ *
+ * @param key удерживаемая клавиша.
+ * @param keyBounds границы клавиши в координатах окна.
+ * @param palette цвета текущей темы клавиатуры.
+ * @param selectedIndex индекс выделенного пункта меню.
+ */
 @Composable
 private fun AlternativesPopup(
     key: KeyInfo,
@@ -1381,6 +1580,14 @@ private fun AlternativesPopup(
     }
 }
 
+/**
+ * Отображает один пункт меню альтернатив с выделением текущего выбора.
+ *
+ * @param key клавиша, которой принадлежит пункт.
+ * @param index сквозной индекс символа или действия.
+ * @param isSelected выделен ли пункт указателем.
+ * @param palette цвета текущей темы клавиатуры.
+ */
 @Composable
 private fun AlternativeMenuItem(
     key: KeyInfo,
@@ -1435,6 +1642,14 @@ private fun AlternativeMenuItem(
     }
 }
 
+/**
+ * Вычисляет размеры и положение меню альтернатив в экранных пикселях.
+ *
+ * @param key удерживаемая клавиша.
+ * @param keyBounds границы клавиши в координатах окна.
+ * @param density плотность экрана для перевода размеров.
+ * @param screenWidthPixels доступная ширина окна в пикселях.
+ */
 private fun alternativePopupGeometry(
     key: KeyInfo,
     keyBounds: Rect,
@@ -1481,6 +1696,12 @@ private fun alternativePopupGeometry(
     )
 }
 
+/**
+ * Находит горизонтальный центр предпочтительного пункта внутри меню.
+ *
+ * @receiver клавиша с настроенным предпочтительным вариантом.
+ * @param density плотность экрана для перевода размеров.
+ */
 private fun KeyInfo.preferredItemCenterPixels(density: Density): Int {
     val rowLengths = menuRowLengths()
     val maximumColumnCount = rowLengths.max()
@@ -1501,6 +1722,12 @@ private fun KeyInfo.preferredItemCenterPixels(density: Density): Int {
         ).roundToInt()
 }
 
+/**
+ * Преобразует сквозной индекс пункта в номер строки и столбца.
+ *
+ * @param index сквозной индекс пункта.
+ * @param rowLengths число пунктов в каждой строке.
+ */
 private fun menuLocation(
     index: Int,
     rowLengths: List<Int>
@@ -1526,11 +1753,30 @@ private fun menuLocation(
     )
 }
 
+/**
+ * Координаты пункта в многострочном меню альтернатив.
+ *
+ * @property row номер строки.
+ * @property column номер столбца внутри строки.
+ */
 private data class AlternativeMenuLocation(
     val row: Int,
     val column: Int
 )
 
+/**
+ * Геометрия меню альтернатив, заранее приведённая к экранным пикселям.
+ *
+ * @property rowLengths число пунктов в строках.
+ * @property maxColumnCount наибольшее число столбцов.
+ * @property itemWidthPixels ширина пункта.
+ * @property rowHeightPixels высота строки.
+ * @property horizontalPaddingPixels горизонтальный внутренний отступ.
+ * @property verticalPaddingPixels вертикальный внутренний отступ.
+ * @property popupLeftPixels левая координата меню в окне.
+ * @property popupTopPixels верхняя координата меню в окне.
+ * @property popupHeightPixels полная высота меню.
+ */
 private data class AlternativePopupGeometry(
     val rowLengths: List<Int>,
     val maxColumnCount: Int,
@@ -1543,12 +1789,28 @@ private data class AlternativePopupGeometry(
     val popupHeightPixels: Int
 )
 
+/**
+ * Размещает меню так, чтобы предпочтительный пункт находился над удерживаемой клавишей.
+ *
+ * @property marginPixels минимальное расстояние до границ окна.
+ * @property preferredItemCenterPixels центр предпочтительного пункта внутри меню.
+ * @property anchorCenterPixels центр удерживаемой клавиши в окне.
+ * @property anchorTopPixels верхняя координата удерживаемой клавиши.
+ */
 private class AlternativePopupPositionProvider(
     private val marginPixels: Int,
     private val preferredItemCenterPixels: Int,
     private val anchorCenterPixels: Int,
     private val anchorTopPixels: Int
 ) : PopupPositionProvider {
+    /**
+     * Вычисляет положение меню в пределах доступной ширины окна.
+     *
+     * @param anchorBounds границы якоря, предоставленные Compose.
+     * @param windowSize размер окна.
+     * @param layoutDirection направление интерфейса.
+     * @param popupContentSize измеренный размер меню.
+     */
     override fun calculatePosition(
         anchorBounds: IntRect,
         windowSize: IntSize,
@@ -1573,6 +1835,13 @@ private class AlternativePopupPositionProvider(
     }
 }
 
+/**
+ * Встраивает системный AndroidX-выбор эмодзи в оболочку Compose.
+ *
+ * @param isDark используется ли тёмное оформление.
+ * @param palette цвета текущей темы клавиатуры.
+ * @param onEmojiPicked обработчик выбранного эмодзи.
+ */
 @Composable
 private fun EmojiPanel(
     isDark: Boolean,
@@ -1633,6 +1902,13 @@ private fun EmojiPanel(
     }
 }
 
+/**
+ * Показывает встроенные дореформенные стикеры или сообщение о несовместимости поля.
+ *
+ * @param palette цвета текущей темы клавиатуры.
+ * @param supportsStickerContent принимает ли текущее поле изображения.
+ * @param onStickerPicked обработчик выбранного стикера.
+ */
 @Composable
 private fun StickersPanel(
     palette: KeyboardPalette,
@@ -1695,6 +1971,13 @@ private fun StickersPanel(
     }
 }
 
+/**
+ * Показывает последний текстовый элемент буфера обмена и позволяет вставить его.
+ *
+ * @param clipboardText текст для предварительного просмотра и вставки.
+ * @param palette цвета текущей темы клавиатуры.
+ * @param onPaste обработчик вставки текста.
+ */
 @Composable
 private fun ClipboardPanel(
     clipboardText: String?,
@@ -1752,6 +2035,13 @@ private fun ClipboardPanel(
     }
 }
 
+/**
+ * Нижняя навигация панелей с возвратом и удалением символа.
+ *
+ * @param palette цвета текущей темы клавиатуры.
+ * @param onBack обработчик возврата к основной раскладке.
+ * @param onBackspace обработчик удаления символа.
+ */
 @Composable
 private fun PanelNavigation(
     palette: KeyboardPalette,
@@ -1812,6 +2102,11 @@ private fun PanelNavigation(
     }
 }
 
+/**
+ * Сопоставляет логический значок вектору Material.
+ *
+ * @receiver логический значок клавиши.
+ */
 private fun KeyIcon.imageVector(): ImageVector {
     return when (this) {
         KeyIcon.BACKSPACE -> Icons.AutoMirrored.Rounded.Backspace
@@ -1826,6 +2121,11 @@ private fun KeyIcon.imageVector(): ImageVector {
     }
 }
 
+/**
+ * Возвращает собственный ресурс для значков, форма которых должна совпадать со снимком.
+ *
+ * @receiver логический значок клавиши.
+ */
 private fun KeyIcon.drawableResource(): Int? {
     return when (this) {
         KeyIcon.BACKSPACE -> R.drawable.ic_outline_backspace_24px
@@ -1835,6 +2135,11 @@ private fun KeyIcon.drawableResource(): Int? {
     }
 }
 
+/**
+ * Подбирает оптический размер значка внутри клавиши.
+ *
+ * @receiver логический значок клавиши.
+ */
 private fun KeyIcon.size(): Dp {
     return when (this) {
         KeyIcon.BACKSPACE -> 28.dp
@@ -1844,18 +2149,33 @@ private fun KeyIcon.size(): Dp {
     }
 }
 
+/**
+ * Возвращает доступное название действия долгого нажатия.
+ *
+ * @receiver действие долгого нажатия.
+ */
 private fun KeyLongPressAction.contentDescription(): String {
     return when (this) {
         KeyLongPressAction.SHOW_EMOJI -> "Открыть эмодзи"
     }
 }
 
+/**
+ * Выбирает значок действия долгого нажатия.
+ *
+ * @receiver действие долгого нажатия.
+ */
 private fun KeyLongPressAction.icon(): KeyIcon {
     return when (this) {
         KeyLongPressAction.SHOW_EMOJI -> KeyIcon.EMOJI
     }
 }
 
+/**
+ * Возвращает доступное название логического значка.
+ *
+ * @receiver логический значок клавиши.
+ */
 private fun KeyIcon.contentDescription(): String {
     return when (this) {
         KeyIcon.BACKSPACE -> "Удалить"
@@ -1870,6 +2190,20 @@ private fun KeyIcon.contentDescription(): String {
     }
 }
 
+/**
+ * Набор цветов клавиатуры для одной системной темы.
+ *
+ * @property background фон всей клавиатуры.
+ * @property key фон обычной клавиши.
+ * @property keySecondary фон служебной клавиши.
+ * @property keyAccent фон активной служебной клавиши.
+ * @property popup фон меню альтернатив.
+ * @property popupSelected фон выделенного пункта меню.
+ * @property popupSelectedText содержимое выделенного пункта.
+ * @property text основной цвет текста и значков.
+ * @property textSecondary дополнительный цвет текста и значков.
+ * @property divider цвет разделителя подсказок.
+ */
 private data class KeyboardPalette(
     val background: Color,
     val key: Color,
@@ -1883,6 +2217,11 @@ private data class KeyboardPalette(
     val divider: Color
 )
 
+/**
+ * Создаёт светлую или тёмную палитру, близкую к системной клавиатуре Android.
+ *
+ * @param isDark нужно ли использовать тёмные цвета.
+ */
 private fun keyboardPalette(isDark: Boolean): KeyboardPalette {
     return if (isDark) {
         KeyboardPalette(

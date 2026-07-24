@@ -9,8 +9,10 @@ import java.security.spec.InvalidKeySpecException
 import java.security.spec.X509EncodedKeySpec
 
 /**
- * Security-related methods. For a secure implementation, all of this code should be implemented on
- * a server that communicates with the application on the device.
+ * Проверяет подписи покупок открытым ключом приложения.
+ *
+ * Проверка на устройстве защищает от случайной подмены ответа, но не заменяет
+ * серверную проверку в приложениях с ценными или постоянными покупками.
  */
 object Security {
     private const val TAG = "IABUtil/Security"
@@ -18,13 +20,12 @@ object Security {
     private const val SIGNATURE_ALGORITHM = "SHA1withRSA"
 
     /**
-     * Verifies that the data was signed with the given signature, and returns the verified
-     * purchase.
-     * @param base64PublicKey the base64-encoded public key to use for verifying.
-     * @param signedData the signed JSON string (signed, not encrypted)
-     * @param signature the signature for the data, signed with the private key
-     * @throws IOException if encoding algorithm is not supported or key specification
-     * is invalid
+     * Проверяет, что [signedData] подписаны ключом, парным к [base64PublicKey].
+     *
+     * @param base64PublicKey открытый ключ в кодировке Base64.
+     * @param signedData подписанные данные покупки в исходном виде.
+     * @param signature подпись данных в кодировке Base64.
+     * @throws IOException если открытый ключ не удалось разобрать.
      */
     @Throws(IOException::class)
     fun verifyPurchase(base64PublicKey: String, signedData: String, signature: String): Boolean {
@@ -37,11 +38,10 @@ object Security {
     }
 
     /**
-     * Generates a PublicKey instance from a string containing the Base64-encoded public key.
+     * Создаёт [PublicKey] из строки Base64 в формате X.509.
      *
-     * @param encodedPublicKey Base64-encoded public key
-     * @throws IOException if encoding algorithm is not supported or key specification
-     * is invalid
+     * @param encodedPublicKey открытый ключ в кодировке Base64.
+     * @throws IOException если спецификация ключа недействительна.
      */
     @Throws(IOException::class)
     fun generatePublicKey(encodedPublicKey: String): PublicKey {
@@ -50,7 +50,7 @@ object Security {
             val keyFactory = KeyFactory.getInstance(KEY_FACTORY_ALGORITHM)
             keyFactory.generatePublic(X509EncodedKeySpec(decodedKey))
         } catch (e: NoSuchAlgorithmException) {
-            // "RSA" is guaranteed to be available.
+            // RSA входит в обязательный набор криптографических алгоритмов Android.
             throw RuntimeException(e)
         } catch (e: InvalidKeySpecException) {
             val msg = "Invalid key specification: $e"
@@ -60,13 +60,12 @@ object Security {
     }
 
     /**
-     * Verifies that the signature from the server matches the computed signature on the data.
-     * Returns true if the data is correctly signed.
+     * Сверяет подпись [signature] с подписью, вычисленной для [signedData].
      *
-     * @param publicKey public key associated with the developer account
-     * @param signedData signed data from server
-     * @param signature server signature
-     * @return true if the data and signature match
+     * @param publicKey открытый ключ учётной записи разработчика.
+     * @param signedData исходные подписанные данные.
+     * @param signature проверяемая подпись в Base64.
+     * @return `true`, если данные подписаны закрытым ключом, парным к [publicKey].
      */
     fun verify(publicKey: PublicKey, signedData: String, signature: String): Boolean {
         val signatureBytes: ByteArray = try {
@@ -85,7 +84,7 @@ object Security {
             }
             return true
         } catch (e: NoSuchAlgorithmException) {
-            // "RSA" is guaranteed to be available.
+            // RSA входит в обязательный набор криптографических алгоритмов Android.
             throw RuntimeException(e)
         } catch (e: InvalidKeyException) {
             Log.w(TAG, "Invalid key specification.")

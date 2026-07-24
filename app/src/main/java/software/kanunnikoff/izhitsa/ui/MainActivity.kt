@@ -16,12 +16,21 @@ import software.kanunnikoff.izhitsa.AppPreferences
 import software.kanunnikoff.izhitsa.R
 import software.kanunnikoff.izhitsa.billing.BillingManager
 
+/**
+ * Главное окно приложения: показывает справку, алфавит, настройки и сведения
+ * о программе, а также связывает интерфейс с оплатой чаевых и аналитикой.
+ */
 class MainActivity : AppCompatActivity(), BillingManager.BillingUpdatesListener {
     internal var billingManager: BillingManager? = null
     private lateinit var firebaseAnalytics: FirebaseAnalytics
     private lateinit var preferences: AppPreferences
     private var keyboardUsageState: MutableState<Boolean>? = null
 
+    /**
+     * Создаёт зависимости окна и корневой интерфейс Compose.
+     *
+     * @param savedInstanceState сохранённое состояние предыдущего экземпляра окна.
+     */
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -73,6 +82,7 @@ class MainActivity : AppCompatActivity(), BillingManager.BillingUpdatesListener 
         ).requestIfNeeded(currentVersion = versionCode.toString())
     }
 
+    /** Обновляет отметку использования клавиатуры после возврата из другого приложения. */
     override fun onResume() {
         super.onResume()
 
@@ -81,6 +91,7 @@ class MainActivity : AppCompatActivity(), BillingManager.BillingUpdatesListener 
         }
     }
 
+    /** Закрывает платёжное соединение вместе с окном. */
     override fun onDestroy() {
         billingManager?.destroy()
         billingManager = null
@@ -88,10 +99,17 @@ class MainActivity : AppCompatActivity(), BillingManager.BillingUpdatesListener 
         super.onDestroy()
     }
 
+    /** Записывает успешную подготовку платёжного клиента в журнал. */
     override fun onBillingClientSetupFinished() {
         Log.d(Tag, "Клиент платежей настроен.")
     }
 
+    /**
+     * Благодарит пользователя и регистрирует подтверждённую покупку в аналитике.
+     *
+     * @param purchase подтверждённая покупка.
+     * @param productDetails сведения о цене либо `null`.
+     */
     override fun onTipsPurchased(
         purchase: Purchase,
         productDetails: ProductDetails?
@@ -104,6 +122,7 @@ class MainActivity : AppCompatActivity(), BillingManager.BillingUpdatesListener 
             ).show()
         }
 
+        // Цена Google Play задана в миллионных долях валютной единицы.
         val offerDetails = productDetails?.oneTimePurchaseOfferDetails
         val price = offerDetails
             ?.priceAmountMicros
@@ -147,6 +166,7 @@ class MainActivity : AppCompatActivity(), BillingManager.BillingUpdatesListener 
         )
     }
 
+    /** Показывает понятное сообщение при любой ошибке платёжного процесса. */
     override fun onBillingError() {
         Log.e(Tag, "Не удалось открыть оплату чаевых.")
 
@@ -159,6 +179,7 @@ class MainActivity : AppCompatActivity(), BillingManager.BillingUpdatesListener 
         }
     }
 
+    /** Регистрирует намерение поддержать автора и запускает покупку чаевых. */
     internal fun supportAuthor() {
         val addToCartParams = Bundle().apply {
             putString(

@@ -8,6 +8,7 @@ import java.io.FileInputStream
 import java.nio.channels.FileChannel
 import java.util.Locale
 
+/** Проверяет извлечение текущего слова, поиск и преобразование регистра подсказок. */
 class SuggestionEngineTest {
     private val russianLocale = Locale.forLanguageTag("ru-RU")
     private val testDictionary = SuggestionDictionary { prefix, limit ->
@@ -18,6 +19,7 @@ class SuggestionEngineTest {
             .take(limit)
     }
 
+    /** Словарный порядок вариантов сохраняется для известного начала слова. */
     @Test
     fun suggestionsMatchDictionaryOrderForKnownPrefix() {
         val suggestions = SuggestionEngine.suggestionsFor(
@@ -32,6 +34,7 @@ class SuggestionEngineTest {
         )
     }
 
+    /** После разделителя текущего слова нет и подсказки не создаются. */
     @Test
     fun suggestionsAreEmptyAfterSeparator() {
         val suggestions = SuggestionEngine.suggestionsFor(
@@ -45,6 +48,7 @@ class SuggestionEngineTest {
         )
     }
 
+    /** Движок не придумывает варианты, отсутствующие в словаре. */
     @Test
     fun unknownWordDoesNotProduceArtificialSuggestions() {
         val suggestions = SuggestionEngine.suggestionsFor(
@@ -59,6 +63,7 @@ class SuggestionEngineTest {
         )
     }
 
+    /** Знаки препинания перед словом не входят в искомое начало. */
     @Test
     fun currentWordIsExtractedAfterPunctuation() {
         assertEquals(
@@ -67,6 +72,7 @@ class SuggestionEngineTest {
         )
     }
 
+    /** Встроенный двоичный словарь находится, разбирается и возвращает совпадения. */
     @Test
     fun bundledDictionaryFindsWordsByRussianPrefix() {
         val dictionaryFile = File("src/main/assets/russian.bin")
@@ -92,6 +98,7 @@ class SuggestionEngineTest {
         )
     }
 
+    /** Переданный источник может вернуть несколько продолжений уже набранного слова. */
     @Test
     fun externalDictionarySupplementsTypedWord() {
         val dictionary = SuggestionDictionary { prefix, limit ->
@@ -112,6 +119,7 @@ class SuggestionEngineTest {
         )
     }
 
+    /** Одноразовый верхний регистр делает прописной только первую букву вариантов. */
     @Test
     fun oneShotShiftCapitalizesSuggestionInitials() {
         val suggestions = SuggestionEngine.suggestionsFor(
@@ -130,6 +138,7 @@ class SuggestionEngineTest {
         )
     }
 
+    /** Caps Lock преобразует варианты полностью в верхний регистр. */
     @Test
     fun capsLockUppercasesEntireSuggestions() {
         val suggestions = SuggestionEngine.suggestionsFor(
@@ -148,6 +157,7 @@ class SuggestionEngineTest {
         )
     }
 
+    /** Начальная прописная сохраняется после автоматического выключения Shift. */
     @Test
     fun typedInitialUppercaseIsPreservedAfterOneShotShiftTurnsOff() {
         val currentWord = "Карп"

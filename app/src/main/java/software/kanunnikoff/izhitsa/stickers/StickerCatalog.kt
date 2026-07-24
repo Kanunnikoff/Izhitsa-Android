@@ -3,16 +3,26 @@ package software.kanunnikoff.izhitsa.stickers
 import androidx.annotation.DrawableRes
 import software.kanunnikoff.izhitsa.R
 
+/**
+ * Описывает встроенный стикер.
+ *
+ * @property identifier устойчивый номер элемента внутри каталога.
+ * @property description текст стикера для получающего приложения и специальных возможностей.
+ * @property drawableResource ресурс изображения, из которого формируется отправляемый файл.
+ */
 data class Sticker(
     val identifier: Int,
     val description: String,
     @param:DrawableRes val drawableResource: Int
 ) {
+    /** Имя временного файла в каталоге кэша. */
     val fileName: String
         get() = "sticker_${identifier.toString().padStart(length = 2, padChar = '0')}.png"
 }
 
+/** Единый перечень стикеров, доступных на панели клавиатуры. */
 object StickerCatalog {
+    /** Стикеры в порядке их отображения в сетке. */
     val items = listOf(
         Sticker(
             identifier = 1,
